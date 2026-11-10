@@ -151,6 +151,94 @@ static void DesenharJogador(Vector2 posicaoJogador, Texture2D spriteJogador){
     DrawTexturePro(spriteJogador, origem, destino, ancora, 0.0f, WHITE);
 }
 
+static bool ResolverArquivoAudio(const char *caminhoRelativo, char *bufferCaminho,
+                                 size_t tamanhoBuffer){
+    const char *diretorioAplicacao = GetApplicationDirectory();
+    int caracteresEscritos =
+        snprintf(bufferCaminho, tamanhoBuffer, "%s%s", diretorioAplicacao,
+                 caminhoRelativo);
+    if (caracteresEscritos >= 0 && (size_t)caracteresEscritos < tamanhoBuffer &&
+        FileExists(bufferCaminho)) {
+        return true;
+    }
+
+    caracteresEscritos = snprintf(bufferCaminho, tamanhoBuffer, "%s", caminhoRelativo);
+    if (caracteresEscritos >= 0 && (size_t)caracteresEscritos < tamanhoBuffer &&
+        FileExists(bufferCaminho)) {
+        return true;
+    }
+
+    bufferCaminho[0] = '\0';
+    TraceLog(LOG_ERROR, "Arquivo de audio nao encontrado: %s", caminhoRelativo);
+    return false;
+}
+
+static bool InicializarSons(Sons *estadoSons){
+    char caminhoMusica[512];
+    char caminhoPassos[512];
+
+    if (!ResolverArquivoAudio("sons\\musica_fundo.mp3", caminhoMusica,sizeof(caminhoMusica)) ||
+        !ResolverArquivoAudio("sons\\passos.mp3", caminhoPassos, sizeof(caminhoPassos))) {
+        TraceLog(LOG_WARNING, "Audio incompleto; a gameplay continuara sem audio.");
+        return false;
+    }
+
+    InitAudioDevice();
+
+    if (!IsAudioDeviceReady()) {
+        TraceLog(LOG_WARNING, "Audio indisponivel; a gameplay continuara sem audio.");
+        return false;
+    }
+
+    estadoSons->dispositivoAudioAtivo = true;
+    estadoSons->musicaFundo = LoadMusicStream(caminhoMusica);
+    estadoSons->musicaPassos = LoadMusicStream(caminhoPassos);
+
+    if (!IsMusicValid(estadoSons->musicaFundo) ||
+        !IsMusicValid(estadoSons->musicaPassos)) {
+        TraceLog(LOG_WARNING, "Falha ao carregar um ou mais audios; audio desativado.");
+        return false;
+    }
+
+    estadoSons->musicaFundo.looping = true;
+    estadoSons->musicaPassos.looping = true;
+    return true;
+}
+
+static void LiberarSons(Sons *estadoSons){
+    if (!estadoSons->dispositivoAudioAtivo) return;
+
+    if (IsMusicValid(estadoSons->musicaFundo)) {
+        StopMusicStream(estadoSons->musicaFundo);
+        UnloadMusicStream(estadoSons->musicaFundo);
+    }
+
+    if (IsMusicValid(estadoSons->musicaPassos)) {
+        StopMusicStream(estadoSons->musicaPassos);
+        UnloadMusicStream(estadoSons->musicaPassos);
+    }
+
+    CloseAudioDevice();
+    estadoSons->dispositivoAudioAtivo = false;
+}
+
+static void AtualizarPassos(Sons *estadoSons, bool teclasMovimentoPressionadas){
+    if (!estadoSons->dispositivoAudioAtivo) return;
+
+    if (teclasMovimentoPressionadas) {
+        if (!estadoSons->somPassosTocando) {
+            PlayMusicStream(estadoSons->musicaPassos);
+            estadoSons->somPassosTocando = true;
+        }
+
+        UpdateMusicStream(estadoSons->musicaPassos);
+
+    } else if (estadoSons->somPassosTocando) {
+        StopMusicStream(estadoSons->musicaPassos);
+        estadoSons->somPassosTocando = false;
+    }
+}
+
 static Rectangle CalcularDestinoTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela){
     const float escala = fmaxf((float)larguraTela / (float)imagemFundo.width, (float)alturaTela / (float)imagemFundo.height);
     const float larguraImagem = (float)imagemFundo.width * escala;
@@ -254,7 +342,7 @@ int main(void){
         return 1;
     }
 
-        if (!FileExists(ARQUIVO_SPRITE_PARADO) || !FileExists(ARQUIVO_SPRITE_ANDANDO) ||
+    if (!FileExists(ARQUIVO_SPRITE_PARADO) || !FileExists(ARQUIVO_SPRITE_ANDANDO) ||
         !FileExists(ARQUIVO_SPRITE_PARADO_ESQUERDA) ||
         !FileExists(ARQUIVO_SPRITE_ANDANDO_ESQUERDA) ||
         !FileExists(ARQUIVO_SPRITE_FRENTE) || !FileExists(ARQUIVO_SPRITE_PARADO_FRENTE) ||
@@ -305,6 +393,13 @@ int main(void){
     SetTextureFilter(spriteTras, TEXTURE_FILTER_POINT);
     SetTextureFilter(spriteParadoTras, TEXTURE_FILTER_POINT);
 
+    Sons sonsJogo = {0};
+
+    const bool audioDisponivel = InicializarSons(&sonsJogo);
+    if (!audioDisponivel) {
+        LiberarSons(&sonsJogo);
+    }
+
     float tempoAnimacaoAndando = 0.0f;
     bool olhandoEsquerda = false;
     bool olhandoParaFrente = false;
@@ -334,6 +429,7 @@ int main(void){
                 (mouseSobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
                 jogoIniciado = true;
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+                if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
             }
 
             BeginDrawing();
@@ -342,7 +438,7 @@ int main(void){
             continue;
         }
 
-                Vector2 direcaoMovimento = {0.0f, 0.0f};
+        Vector2 direcaoMovimento = {0.0f, 0.0f};
 
         if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) direcaoMovimento.x -= 1.0f;
         if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) direcaoMovimento.x += 1.0f;
@@ -386,6 +482,11 @@ int main(void){
         const float metadeAlturaVisivel = alturaTela / (2.0f * camera.zoom);
         camera.target.x = fmaxf(metadeLarguraVisivel, fminf(jogador.x, MAPA_LARGURA - metadeLarguraVisivel));
         camera.target.y = fmaxf(metadeAlturaVisivel, fminf(jogador.y, MAPA_ALTURA - metadeAlturaVisivel));
+        
+        if (sonsJogo.dispositivoAudioAtivo) {
+            UpdateMusicStream(sonsJogo.musicaFundo);
+            AtualizarPassos(&sonsJogo, teclasMovimentoPressionadas);
+        }
 
         BeginDrawing();
         ClearBackground((Color){4, 8, 8, 255});
@@ -409,6 +510,7 @@ int main(void){
         EndDrawing();
     }
 
+    LiberarSons(&sonsJogo);
     UnloadTexture(spriteParado);
     UnloadTexture(spriteAndando);
     UnloadTexture(spriteParadoEsquerda);
