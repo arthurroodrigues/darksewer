@@ -468,6 +468,8 @@ int main(void){
     const bool audioDisponivel = InicializarSons(&sonsJogo);
     if (!audioDisponivel) {
         LiberarSons(&sonsJogo);
+    } else {
+        PlayMusicStream(sonsJogo.musicaFundo);
     }
 
     Shader shaderLanterna = LoadShaderFromMemory(NULL, kShaderLanterna);
@@ -525,8 +527,9 @@ int main(void){
                 (mouseSobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
                 jogoIniciado = true;
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-                if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
             }
+
+            if (audioDisponivel) UpdateMusicStream(sonsJogo.musicaFundo);
 
             BeginDrawing();
             DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
