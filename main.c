@@ -2,6 +2,7 @@
 #include "raymath.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define MAPA_ARQUIVO "assets\\mapa.png"
 #define PAREDES_ARQUIVO "assets\\mapa_paredes.png"
@@ -298,6 +299,58 @@ static void DesenharTelaInicial(Texture2D imagemFundo, int larguraTela, int altu
                    (Color){255, 255, 255, (unsigned char)(255.0f * opacidade)});
 }
 
+typedef struct loot {
+    int numero;
+    struct loot *anterior;
+    struct loot *proximo;
+} loot;
+
+static loot *CriarHotbar(void){
+    loot *primeiro = NULL;
+    loot *ultimo = NULL;
+
+    for (int i = 0; i < 5; i++) {
+        loot *novo = malloc(sizeof(loot));
+        novo->numero = i + 1;
+        novo->anterior = ultimo;
+        novo->proximo = NULL;
+
+        if (ultimo == NULL) primeiro = novo;
+        else ultimo->proximo = novo;
+        ultimo = novo;
+    }
+
+    ultimo->proximo = primeiro;
+    primeiro->anterior = ultimo;
+    return primeiro;
+}
+
+static void LiberarHotbar(loot *primeiro){
+    loot *no = primeiro;
+    for (int i = 0; i < 5; i++) {
+        loot *proximo = no->proximo;
+        free(no);
+        no = proximo;
+    }
+}
+
+static void DesenharHotbar(loot *primeiro, loot *selecionado, int larguraTela, int alturaTela){
+    const int tamanho = 48;
+    const int espaco = 6;
+    const int inicioX = (larguraTela - (5 * tamanho + 4 * espaco)) / 2;
+    const int y = alturaTela - tamanho - 20;
+
+    loot *no = primeiro;
+    for (int i = 0; i < 5; i++) {
+        const int x = inicioX + i * (tamanho + espaco);
+        const bool ativo = (no == selecionado);
+
+        DrawRectangle(x, y, tamanho, tamanho, (Color){10, 16, 15, 200});
+        DrawRectangleLinesEx((Rectangle){x, y, tamanho, tamanho}, ativo ? 3 : 2, ativo ? (Color){176, 18, 24, 255} : (Color){74, 88, 82, 255});
+        no = no->proximo;
+    }
+}
+
 int main(void){
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(LARGURA_JANELA, ALTURA_JANELA, "Dark Sewer");
@@ -453,6 +506,9 @@ int main(void){
     bool jogoIniciado = false;
     float opacidadeTelaInicial = 0.0f;
 
+    loot *primeiroSlot = CriarHotbar();
+    loot *slotSelecionado = primeiroSlot;
+
     while (!WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
         const int larguraTela = GetScreenWidth();
@@ -477,6 +533,9 @@ int main(void){
             EndDrawing();
             continue;
         }
+
+        if (IsKeyPressed(KEY_E) || GetMouseWheelMove() < 0.0f) slotSelecionado = slotSelecionado->proximo;
+        if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) slotSelecionado = slotSelecionado->anterior;
 
         Vector2 direcaoMovimento = {0.0f, 0.0f};
 
@@ -564,9 +623,12 @@ int main(void){
             DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
         EndShaderMode();
 
+        DesenharHotbar(primeiroSlot, slotSelecionado, larguraTela, alturaTela);
+
         EndDrawing();
     }
 
+    LiberarHotbar(primeiroSlot);
     UnloadShader(shaderLanterna);
     LiberarSons(&sonsJogo);
     UnloadTexture(spriteParado);
