@@ -8,6 +8,7 @@
 #define TELA_INICIAL_ARQUIVO "assets\\tela_de_inicio.png"
 #define MAPA_LARGURA 768
 #define MAPA_ALTURA 991
+#define ZOOM_CAMERA 4.0f
 #define JOGADOR_INICIAL_X 96.0f
 #define JOGADOR_INICIAL_Y 816.0f
 #define MEIA_LARGURA_HITBOX_PES 2.5f
@@ -230,6 +231,10 @@ int main(void){
         return 1;
     }
 
+    Camera2D camera = {0};
+    camera.offset = (Vector2){GetScreenWidth() * 0.5f, GetScreenHeight() * 0.5f};
+    camera.zoom = ZOOM_CAMERA;
+
     bool jogoIniciado = false;
     float opacidadeTelaInicial = 0.0f;
 
@@ -257,11 +262,20 @@ int main(void){
             continue;
         }
 
+        camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
+        camera.zoom = ZOOM_CAMERA;
+        const float metadeLarguraVisivel = larguraTela / (2.0f * camera.zoom);
+        const float metadeAlturaVisivel = alturaTela / (2.0f * camera.zoom);
+        camera.target.x = fmaxf(metadeLarguraVisivel, fminf(jogador.x, MAPA_LARGURA - metadeLarguraVisivel));
+        camera.target.y = fmaxf(metadeAlturaVisivel, fminf(jogador.y, MAPA_ALTURA - metadeAlturaVisivel));
+
         BeginDrawing();
         ClearBackground((Color){4, 8, 8, 255});
+        BeginMode2D(camera);
         const Rectangle origemMapa = {0.0f, 0.0f, (float)mapa.width, (float)mapa.height};
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+        EndMode2D();
         EndDrawing();
     }
 
