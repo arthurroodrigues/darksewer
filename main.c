@@ -10,6 +10,8 @@
 #define MAPA_ALTURA 991
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 4.0f
+#define RAIO_LANTERNA 115.0f
+#define INTENSIDADE_ESCURO 1.0f
 #define VELOCIDADE_JOGADOR 112.0f
 #define JOGADOR_INICIAL_X 96.0f
 #define JOGADOR_INICIAL_Y 816.0f
@@ -31,6 +33,21 @@
 static Color *pixelsMascaraParedes;
 static int larguraMascaraParedes;
 static int alturaMascaraParedes;
+
+static const char *kShaderLanterna =
+    "#version 330\n"
+    "uniform vec2 uLightPosition;\n"
+    "uniform float uRadius;\n"
+    "uniform float uDarkness;\n"
+    "out vec4 finalColor;\n"
+    "void main() {\n"
+    "vec2 delta = gl_FragCoord.xy - uLightPosition;\n"
+    "float distanceToLight = length(delta);\n"
+    "float radialEdge = smoothstep(uRadius * 0.48, uRadius, distanceToLight);\n"
+    "float alpha = mix(0.13, uDarkness, radialEdge);\n"
+    "vec3 color = mix(vec3(0.17, 0.12, 0.045), vec3(0.003, 0.010, 0.008), radialEdge);\n"
+    "finalColor = vec4(color, alpha);\n"
+    "}\n";
 
 static bool CarregarMascaraParedes(int larguraMapaFonte, int alturaMapaFonte){
     Image imagem = LoadImage(PAREDES_ARQUIVO);
@@ -394,11 +411,34 @@ int main(void){
     SetTextureFilter(spriteParadoTras, TEXTURE_FILTER_POINT);
 
     Sons sonsJogo = {0};
-
+    
     const bool audioDisponivel = InicializarSons(&sonsJogo);
     if (!audioDisponivel) {
         LiberarSons(&sonsJogo);
     }
+
+    Shader shaderLanterna = LoadShaderFromMemory(NULL, kShaderLanterna);
+    if (!IsShaderValid(shaderLanterna)) {
+        TraceLog(LOG_ERROR, "Nao foi possivel criar o shader da lanterna.");
+        LiberarSons(&sonsJogo);
+        UnloadTexture(spriteParado);
+        UnloadTexture(spriteAndando);
+        UnloadTexture(spriteParadoEsquerda);
+        UnloadTexture(spriteAndandoEsquerda);
+        UnloadTexture(spriteFrente);
+        UnloadTexture(spriteParadoFrente);
+        UnloadTexture(spriteTras);
+        UnloadTexture(spriteParadoTras);
+        LiberarMascaraParedes();
+        UnloadTexture(telaInicial);
+        UnloadTexture(mapa);
+        CloseWindow();
+        return 1;
+    }
+
+    const int localLuzShader = GetShaderLocation(shaderLanterna, "uLightPosition");
+    const int localRaioShader = GetShaderLocation(shaderLanterna, "uRadius");
+    const int localEscuridaoShader = GetShaderLocation(shaderLanterna, "uDarkness");
 
     float tempoAnimacaoAndando = 0.0f;
     bool olhandoEsquerda = false;
@@ -488,6 +528,18 @@ int main(void){
             AtualizarPassos(&sonsJogo, teclasMovimentoPressionadas);
         }
 
+        const Vector2 posicaoJogadorNaTela = GetWorldToScreen2D(jogador, camera);
+        const Vector2 posicaoLuzShader = {
+            posicaoJogadorNaTela.x,
+            (float)alturaTela - posicaoJogadorNaTela.y
+        };
+
+        const float raioLuzShader = RAIO_LANTERNA * camera.zoom;
+
+        SetShaderValue(shaderLanterna, localLuzShader, &posicaoLuzShader, SHADER_UNIFORM_VEC2);
+        SetShaderValue(shaderLanterna, localRaioShader, &raioLuzShader, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(shaderLanterna, localEscuridaoShader, &(float){INTENSIDADE_ESCURO}, SHADER_UNIFORM_FLOAT);
+
         BeginDrawing();
         ClearBackground((Color){4, 8, 8, 255});
         BeginMode2D(camera);
@@ -507,9 +559,15 @@ int main(void){
         DesenharJogador(jogador, spriteAtual);
 
         EndMode2D();
+
+        BeginShaderMode(shaderLanterna);
+            DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
+        EndShaderMode();
+
         EndDrawing();
     }
 
+    UnloadShader(shaderLanterna);
     LiberarSons(&sonsJogo);
     UnloadTexture(spriteParado);
     UnloadTexture(spriteAndando);
