@@ -8,12 +8,23 @@
 #define TELA_INICIAL_ARQUIVO "assets\\tela_de_inicio.png"
 #define MAPA_LARGURA 768
 #define MAPA_ALTURA 991
+#define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 4.0f
+#define VELOCIDADE_JOGADOR 112.0f
 #define JOGADOR_INICIAL_X 96.0f
 #define JOGADOR_INICIAL_Y 816.0f
 #define MEIA_LARGURA_HITBOX_PES 2.5f
 #define ALTURA_HITBOX_PES 2.0f
 #define DESLOCAMENTO_HITBOX_PES_Y 2.0f
+#define ALTURA_SPRITE_JOGADOR 32.5f
+#define ARQUIVO_SPRITE_PARADO "assets\\jogador_parado.png"
+#define ARQUIVO_SPRITE_ANDANDO "assets\\jogador_andando.png"
+#define ARQUIVO_SPRITE_PARADO_ESQUERDA "assets\\jogador_parado_esquerda.png"
+#define ARQUIVO_SPRITE_ANDANDO_ESQUERDA "assets\\jogador_andando_esquerda.png"
+#define ARQUIVO_SPRITE_FRENTE "assets\\jogador_andando_para_frente.png"
+#define ARQUIVO_SPRITE_PARADO_FRENTE "assets\\jogador_parado_para_frente.png"
+#define ARQUIVO_SPRITE_TRAS "assets\\jogador_andando_para_tras.png"
+#define ARQUIVO_SPRITE_PARADO_TRAS "assets\\jogador_parado_para_tras.png"
 #define LARGURA_JANELA 960
 #define ALTURA_JANELA 720
 
@@ -128,6 +139,18 @@ static Vector2 MoverComColisao(Vector2 posicaoJogador, Vector2 deslocamentoJogad
     return posicaoJogador;
 }
 
+static void DesenharJogador(Vector2 posicaoJogador, Texture2D spriteJogador){
+    const float escala = ALTURA_SPRITE_JOGADOR / (float)spriteJogador.height;
+    const float largura = (float)spriteJogador.width * escala;
+    const float altura = (float)spriteJogador.height * escala;
+    const Rectangle origem = {
+        0.0f, 0.0f, (float)spriteJogador.width, (float)spriteJogador.height
+    };
+    const Rectangle destino = {posicaoJogador.x, posicaoJogador.y, largura, altura};
+    const Vector2 ancora = {largura * 0.5f, altura};
+    DrawTexturePro(spriteJogador, origem, destino, ancora, 0.0f, WHITE);
+}
+
 static Rectangle CalcularDestinoTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela){
     const float escala = fmaxf((float)larguraTela / (float)imagemFundo.width, (float)alturaTela / (float)imagemFundo.height);
     const float larguraImagem = (float)imagemFundo.width * escala;
@@ -231,6 +254,63 @@ int main(void){
         return 1;
     }
 
+        if (!FileExists(ARQUIVO_SPRITE_PARADO) || !FileExists(ARQUIVO_SPRITE_ANDANDO) ||
+        !FileExists(ARQUIVO_SPRITE_PARADO_ESQUERDA) ||
+        !FileExists(ARQUIVO_SPRITE_ANDANDO_ESQUERDA) ||
+        !FileExists(ARQUIVO_SPRITE_FRENTE) || !FileExists(ARQUIVO_SPRITE_PARADO_FRENTE) ||
+        !FileExists(ARQUIVO_SPRITE_TRAS) || !FileExists(ARQUIVO_SPRITE_PARADO_TRAS)) {
+        TraceLog(LOG_ERROR, "Sprites ausentes. Verifique os arquivos dentro da pasta assets.");
+        LiberarMascaraParedes();
+        UnloadTexture(telaInicial);
+        UnloadTexture(mapa);
+        CloseWindow();
+        return 1;
+    }
+
+    Texture2D spriteParado = LoadTexture(ARQUIVO_SPRITE_PARADO);
+    Texture2D spriteAndando = LoadTexture(ARQUIVO_SPRITE_ANDANDO);
+    Texture2D spriteParadoEsquerda = LoadTexture(ARQUIVO_SPRITE_PARADO_ESQUERDA);
+    Texture2D spriteAndandoEsquerda = LoadTexture(ARQUIVO_SPRITE_ANDANDO_ESQUERDA);
+    Texture2D spriteFrente = LoadTexture(ARQUIVO_SPRITE_FRENTE);
+    Texture2D spriteParadoFrente = LoadTexture(ARQUIVO_SPRITE_PARADO_FRENTE);
+    Texture2D spriteTras = LoadTexture(ARQUIVO_SPRITE_TRAS);
+    Texture2D spriteParadoTras = LoadTexture(ARQUIVO_SPRITE_PARADO_TRAS);
+
+    if (spriteParado.id == 0 || spriteAndando.id == 0 ||
+        spriteParadoEsquerda.id == 0 || spriteAndandoEsquerda.id == 0 ||
+        spriteFrente.id == 0 || spriteParadoFrente.id == 0 ||
+        spriteTras.id == 0 || spriteParadoTras.id == 0) {
+        TraceLog(LOG_ERROR, "Falha ao carregar os sprites do jogador.");
+        if (spriteParado.id != 0) UnloadTexture(spriteParado);
+        if (spriteAndando.id != 0) UnloadTexture(spriteAndando);
+        if (spriteParadoEsquerda.id != 0) UnloadTexture(spriteParadoEsquerda);
+        if (spriteAndandoEsquerda.id != 0) UnloadTexture(spriteAndandoEsquerda);
+        if (spriteFrente.id != 0) UnloadTexture(spriteFrente);
+        if (spriteParadoFrente.id != 0) UnloadTexture(spriteParadoFrente);
+        if (spriteTras.id != 0) UnloadTexture(spriteTras);
+        if (spriteParadoTras.id != 0) UnloadTexture(spriteParadoTras);
+        LiberarMascaraParedes();
+        UnloadTexture(telaInicial);
+        UnloadTexture(mapa);
+        CloseWindow();
+        return 1;
+    }
+
+    SetTextureFilter(spriteParado, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteAndando, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteParadoEsquerda, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteAndandoEsquerda, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteFrente, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteParadoFrente, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteTras, TEXTURE_FILTER_POINT);
+    SetTextureFilter(spriteParadoTras, TEXTURE_FILTER_POINT);
+
+    float tempoAnimacaoAndando = 0.0f;
+    bool olhandoEsquerda = false;
+    bool olhandoParaFrente = false;
+    bool olhandoVertical = false;
+    bool quadroAnimacaoAndando = false;
+
     Camera2D camera = {0};
     camera.offset = (Vector2){GetScreenWidth() * 0.5f, GetScreenHeight() * 0.5f};
     camera.zoom = ZOOM_CAMERA;
@@ -262,6 +342,44 @@ int main(void){
             continue;
         }
 
+                Vector2 direcaoMovimento = {0.0f, 0.0f};
+
+        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) direcaoMovimento.x -= 1.0f;
+        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) direcaoMovimento.x += 1.0f;
+        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) direcaoMovimento.y -= 1.0f;
+        if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) direcaoMovimento.y += 1.0f;
+        const bool teclasMovimentoPressionadas = Vector2LengthSqr(direcaoMovimento) > 0.0f;
+        const Vector2 posicaoAnteriorJogador = jogador;
+
+        if (teclasMovimentoPressionadas) {
+            direcaoMovimento = Vector2Normalize(direcaoMovimento);
+            jogador = MoverComColisao(jogador, Vector2Scale(direcaoMovimento, VELOCIDADE_JOGADOR * deltaTempo));
+        }
+
+        const bool jogadorEstaSeMovendo = Vector2DistanceSqr(jogador, posicaoAnteriorJogador) > 0.0001f;
+        const float deslocamentoJogadorX = jogador.x - posicaoAnteriorJogador.x;
+        const float deslocamentoJogadorY = jogador.y - posicaoAnteriorJogador.y;
+        const bool movimentoVertical = jogadorEstaSeMovendo && fabsf(deslocamentoJogadorY) > fabsf(deslocamentoJogadorX);
+
+        if (jogadorEstaSeMovendo) {
+            if (movimentoVertical) {
+                olhandoParaFrente = deslocamentoJogadorY > 0.0f;
+                olhandoVertical = true;
+            } else {
+                olhandoEsquerda = deslocamentoJogadorX < 0.0f;
+                olhandoVertical = false;
+            }
+
+            tempoAnimacaoAndando += deltaTempo;
+            if (tempoAnimacaoAndando >= INTERVALO_ANIMACAO) {
+                tempoAnimacaoAndando -= INTERVALO_ANIMACAO;
+                quadroAnimacaoAndando = !quadroAnimacaoAndando;
+            }
+        } else {
+            tempoAnimacaoAndando = 0.0f;
+            quadroAnimacaoAndando = false;
+        }
+
         camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
         camera.zoom = ZOOM_CAMERA;
         const float metadeLarguraVisivel = larguraTela / (2.0f * camera.zoom);
@@ -275,10 +393,30 @@ int main(void){
         const Rectangle origemMapa = {0.0f, 0.0f, (float)mapa.width, (float)mapa.height};
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+
+        const Texture2D spriteAtual = olhandoVertical
+            ? (olhandoParaFrente
+                ? (quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
+                : (quadroAnimacaoAndando ? spriteTras : spriteParadoTras))
+            : (olhandoEsquerda
+                ? (jogadorEstaSeMovendo && quadroAnimacaoAndando
+                    ? spriteAndandoEsquerda : spriteParadoEsquerda)
+                : (jogadorEstaSeMovendo && quadroAnimacaoAndando
+                    ? spriteAndando : spriteParado));
+        DesenharJogador(jogador, spriteAtual);
+
         EndMode2D();
         EndDrawing();
     }
 
+    UnloadTexture(spriteParado);
+    UnloadTexture(spriteAndando);
+    UnloadTexture(spriteParadoEsquerda);
+    UnloadTexture(spriteAndandoEsquerda);
+    UnloadTexture(spriteFrente);
+    UnloadTexture(spriteParadoFrente);
+    UnloadTexture(spriteTras);
+    UnloadTexture(spriteParadoTras);
     LiberarMascaraParedes();
     UnloadTexture(telaInicial);
     UnloadTexture(mapa);
