@@ -247,16 +247,17 @@ int main(void){
         }
 
         const bool jogadorEstaSeMovendo = Vector2DistanceSqr(jogador, posicaoAnteriorJogador) > 0.0001f;
-        const float deslocamentoJogadorX = jogador.x - posicaoAnteriorJogador.x;
-        const float deslocamentoJogadorY = jogador.y - posicaoAnteriorJogador.y;
-        const bool movimentoVertical = jogadorEstaSeMovendo && fabsf(deslocamentoJogadorY) > fabsf(deslocamentoJogadorX);
 
         if (jogadorEstaSeMovendo) {
-            if (movimentoVertical) {
-                olhandoParaFrente = deslocamentoJogadorY > 0.0f;
+            const float intensidadeHorizontal = fabsf(direcaoMovimento.x);
+            const float intensidadeVertical = fabsf(direcaoMovimento.y);
+
+            if (intensidadeVertical > intensidadeHorizontal ||
+                (intensidadeVertical == intensidadeHorizontal && olhandoVertical)) {
+                olhandoParaFrente = direcaoMovimento.y > 0.0f;
                 olhandoVertical = true;
             } else {
-                olhandoEsquerda = deslocamentoJogadorX < 0.0f;
+                olhandoEsquerda = direcaoMovimento.x < 0.0f;
                 olhandoVertical = false;
             }
 

@@ -42,7 +42,7 @@ void DesenharHotbar(loot *primeiro, loot *selecionado, int larguraTela, int altu
         const bool ativo = (no == selecionado);
 
         DrawRectangle(x, y, tamanho, tamanho, (Color){10, 16, 15, 200});
-        DrawRectangleLinesEx((Rectangle){x, y, tamanho, tamanho}, ativo ? 3 : 2, ativo ? (Color){176, 18, 24, 255} : (Color){74, 88, 82, 255});
+        DrawRectangleLinesEx((Rectangle){x, y, tamanho, tamanho}, ativo ? 3 : 2, ativo ? (Color){150, 112, 72, 255} : (Color){74, 88, 82, 255});
         no = no->proximo;
     }
 }
