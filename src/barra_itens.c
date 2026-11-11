@@ -68,7 +68,7 @@ void LiberarHotbar(loot *primeiro){
 }
 
 void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria){
-    const int tamanho = 48;
+    const int tamanho = 60;
     const int espaco = 6;
     const int inicioX = 20;
     const int y = 20;
