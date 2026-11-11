@@ -10,9 +10,9 @@
 #define MAPA_ARQUIVO "assets\\mapa.png"
 #define TELA_INICIAL_ARQUIVO "assets\\tela_de_inicio.png"
 #define INTERVALO_ANIMACAO 0.18f
-#define ZOOM_CAMERA 5.0f
-#define RAIO_LANTERNA 90.0f
-#define INTENSIDADE_ESCURO 1.0f
+#define ZOOM_CAMERA 6.5f
+#define RAIO_LANTERNA 75.0f
+#define INTENSIDADE_ESCURO 0.99f
 #define VELOCIDADE_JOGADOR 112.0f
 #define JOGADOR_INICIAL_X 96.0f
 #define JOGADOR_INICIAL_Y 816.0f
@@ -217,10 +217,11 @@ int main(void){
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
                 (mouseSobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
                 jogoIniciado = true;
+                if (audioDisponivel) StopMusicStream(sonsJogo.musicaFundo);
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
 
-            if (audioDisponivel) UpdateMusicStream(sonsJogo.musicaFundo);
+            if (audioDisponivel && !jogoIniciado) UpdateMusicStream(sonsJogo.musicaFundo);
 
             BeginDrawing();
             DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
@@ -280,7 +281,6 @@ int main(void){
         camera.target.y = fmaxf(metadeAlturaVisivel, fminf(jogador.y, MAPA_ALTURA - metadeAlturaVisivel));
         
         if (sonsJogo.dispositivoAudioAtivo) {
-            UpdateMusicStream(sonsJogo.musicaFundo);
             AtualizarPassos(&sonsJogo, teclasMovimentoPressionadas);
         }
 
