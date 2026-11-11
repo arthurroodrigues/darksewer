@@ -25,6 +25,7 @@ bool ResolverArquivoAudio(const char *caminhoRelativo, char *bufferCaminho, size
 bool InicializarSons(Sons *estadoSons){
     char caminhoMusica[512];
     char caminhoPassos[512];
+    char caminhoColeta[512];
 
     if (!ResolverArquivoAudio("sons\\musica_fundo.mp3", caminhoMusica,sizeof(caminhoMusica)) ||
         !ResolverArquivoAudio("sons\\passos.mp3", caminhoPassos, sizeof(caminhoPassos))) {
@@ -49,6 +50,16 @@ bool InicializarSons(Sons *estadoSons){
         return false;
     }
 
+    if (ResolverArquivoAudio("sons\\coleta.wav", caminhoColeta,
+                             sizeof(caminhoColeta))) {
+        estadoSons->somColeta = LoadSound(caminhoColeta);
+        if (!IsSoundValid(estadoSons->somColeta)) {
+            TraceLog(LOG_WARNING, "Falha ao carregar o efeito sonoro de coleta.");
+        }
+    } else {
+        TraceLog(LOG_WARNING, "Efeito sonoro de coleta indisponivel.");
+    }
+
     estadoSons->musicaFundo.looping = true;
     estadoSons->musicaPassos.looping = true;
     return true;
@@ -65,6 +76,10 @@ void LiberarSons(Sons *estadoSons){
     if (IsMusicValid(estadoSons->musicaPassos)) {
         StopMusicStream(estadoSons->musicaPassos);
         UnloadMusicStream(estadoSons->musicaPassos);
+    }
+
+    if (IsSoundValid(estadoSons->somColeta)) {
+        UnloadSound(estadoSons->somColeta);
     }
 
     CloseAudioDevice();
@@ -85,5 +100,11 @@ void AtualizarPassos(Sons *estadoSons, bool teclasMovimentoPressionadas){
     } else if (estadoSons->somPassosTocando) {
         StopMusicStream(estadoSons->musicaPassos);
         estadoSons->somPassosTocando = false;
+    }
+}
+
+void TocarSomColeta(Sons *estadoSons){
+    if (estadoSons->dispositivoAudioAtivo && IsSoundValid(estadoSons->somColeta)) {
+        PlaySound(estadoSons->somColeta);
     }
 }

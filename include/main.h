@@ -7,6 +7,7 @@
 typedef struct {
     Music musicaFundo;
     Music musicaPassos;
+    Sound somColeta;
     bool dispositivoAudioAtivo;
     bool somPassosTocando;
 } Sons;

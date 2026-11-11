@@ -3,15 +3,23 @@
 
 #include "raylib.h"
 
+typedef enum {
+    ITEM_NENHUM,
+    ITEM_BATERIA
+} ItemHotbar;
+
+#define QUANTIDADE_MAXIMA_POR_SLOT 3
+
 typedef struct loot {
-    int numero;
+    ItemHotbar item;
+    int quantidade;
     struct loot *anterior;
     struct loot *proximo;
 } loot;
 
 loot *CriarHotbar(void);
 void LiberarHotbar(loot *primeiro);
-void DesenharHotbar(loot *primeiro, loot *selecionado, int larguraTela,
-                    int alturaTela);
+bool AdicionarItemHotbar(loot *primeiro, ItemHotbar item);
+void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria);
 
 #endif

@@ -6,13 +6,20 @@
 #include "jogador.h"
 #include "raymath.h"
 #include <math.h>
+#include <time.h>
 
 #define MAPA_ARQUIVO "assets\\mapa.png"
 #define TELA_INICIAL_ARQUIVO "assets\\tela_de_inicio.png"
+#define BATERIA_ARQUIVO "assets\\bateria.png"
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 6.5f
 #define RAIO_LANTERNA 75.0f
 #define INTENSIDADE_ESCURO 0.99f
+#define TAMANHO_BATERIA_MAPA 15.0f
+#define RAIO_COLETA_BATERIA 24.0f
+#define DISTANCIA_MINIMA_SPAWN_BATERIA 96.0f
+#define DISTANCIA_MINIMA_ENTRE_BATERIAS 160.0f
+#define QUANTIDADE_BATERIAS 3
 #define VELOCIDADE_JOGADOR 112.0f
 #define JOGADOR_INICIAL_X 96.0f
 #define JOGADOR_INICIAL_Y 816.0f
@@ -103,12 +110,28 @@ int main(void){
         return 1;
     }
 
+    SetRandomSeed((unsigned int)time(NULL) ^ (unsigned int)(GetTime() * 1000000.0));
+    Vector2 posicoesBateria[QUANTIDADE_BATERIAS] = {0};
+    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
+        if (!EncontrarPosicaoAcessivelAleatoria(
+                jogador, DISTANCIA_MINIMA_SPAWN_BATERIA,
+                posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
+                &posicoesBateria[i])) {
+            LiberarMascaraParedes();
+            UnloadTexture(telaInicial);
+            UnloadTexture(mapa);
+            CloseWindow();
+            return 1;
+        }
+    }
+
     if (!FileExists(ARQUIVO_SPRITE_PARADO) || !FileExists(ARQUIVO_SPRITE_ANDANDO) ||
         !FileExists(ARQUIVO_SPRITE_PARADO_ESQUERDA) ||
         !FileExists(ARQUIVO_SPRITE_ANDANDO_ESQUERDA) ||
         !FileExists(ARQUIVO_SPRITE_FRENTE) || !FileExists(ARQUIVO_SPRITE_PARADO_FRENTE) ||
-        !FileExists(ARQUIVO_SPRITE_TRAS) || !FileExists(ARQUIVO_SPRITE_PARADO_TRAS)) {
-        TraceLog(LOG_ERROR, "Sprites ausentes. Verifique os arquivos dentro da pasta assets.");
+        !FileExists(ARQUIVO_SPRITE_TRAS) || !FileExists(ARQUIVO_SPRITE_PARADO_TRAS) ||
+        !FileExists(BATERIA_ARQUIVO)) {
+        TraceLog(LOG_ERROR, "Sprites ou bateria ausentes. Verifique os arquivos dentro da pasta assets.");
         LiberarMascaraParedes();
         UnloadTexture(telaInicial);
         UnloadTexture(mapa);
@@ -124,12 +147,13 @@ int main(void){
     Texture2D spriteParadoFrente = LoadTexture(ARQUIVO_SPRITE_PARADO_FRENTE);
     Texture2D spriteTras = LoadTexture(ARQUIVO_SPRITE_TRAS);
     Texture2D spriteParadoTras = LoadTexture(ARQUIVO_SPRITE_PARADO_TRAS);
+    Texture2D bateria = LoadTexture(BATERIA_ARQUIVO);
 
     if (spriteParado.id == 0 || spriteAndando.id == 0 ||
         spriteParadoEsquerda.id == 0 || spriteAndandoEsquerda.id == 0 ||
         spriteFrente.id == 0 || spriteParadoFrente.id == 0 ||
-        spriteTras.id == 0 || spriteParadoTras.id == 0) {
-        TraceLog(LOG_ERROR, "Falha ao carregar os sprites do jogador.");
+        spriteTras.id == 0 || spriteParadoTras.id == 0 || bateria.id == 0) {
+        TraceLog(LOG_ERROR, "Falha ao carregar os sprites do jogador ou a bateria.");
         if (spriteParado.id != 0) UnloadTexture(spriteParado);
         if (spriteAndando.id != 0) UnloadTexture(spriteAndando);
         if (spriteParadoEsquerda.id != 0) UnloadTexture(spriteParadoEsquerda);
@@ -138,6 +162,7 @@ int main(void){
         if (spriteParadoFrente.id != 0) UnloadTexture(spriteParadoFrente);
         if (spriteTras.id != 0) UnloadTexture(spriteTras);
         if (spriteParadoTras.id != 0) UnloadTexture(spriteParadoTras);
+        if (bateria.id != 0) UnloadTexture(bateria);
         LiberarMascaraParedes();
         UnloadTexture(telaInicial);
         UnloadTexture(mapa);
@@ -153,6 +178,7 @@ int main(void){
     SetTextureFilter(spriteParadoFrente, TEXTURE_FILTER_POINT);
     SetTextureFilter(spriteTras, TEXTURE_FILTER_POINT);
     SetTextureFilter(spriteParadoTras, TEXTURE_FILTER_POINT);
+    SetTextureFilter(bateria, TEXTURE_FILTER_BILINEAR);
 
     Sons sonsJogo = {0};
     
@@ -175,6 +201,7 @@ int main(void){
         UnloadTexture(spriteParadoFrente);
         UnloadTexture(spriteTras);
         UnloadTexture(spriteParadoTras);
+        UnloadTexture(bateria);
         LiberarMascaraParedes();
         UnloadTexture(telaInicial);
         UnloadTexture(mapa);
@@ -200,7 +227,27 @@ int main(void){
     float opacidadeTelaInicial = 0.0f;
 
     loot *primeiroSlot = CriarHotbar();
+    if (primeiroSlot == NULL) {
+        TraceLog(LOG_ERROR, "Falha ao criar a barra de itens.");
+        UnloadShader(shaderLanterna);
+        LiberarSons(&sonsJogo);
+        UnloadTexture(spriteParado);
+        UnloadTexture(spriteAndando);
+        UnloadTexture(spriteParadoEsquerda);
+        UnloadTexture(spriteAndandoEsquerda);
+        UnloadTexture(spriteFrente);
+        UnloadTexture(spriteParadoFrente);
+        UnloadTexture(spriteTras);
+        UnloadTexture(spriteParadoTras);
+        UnloadTexture(bateria);
+        LiberarMascaraParedes();
+        UnloadTexture(telaInicial);
+        UnloadTexture(mapa);
+        CloseWindow();
+        return 1;
+    }
     loot *slotSelecionado = primeiroSlot;
+    bool bateriasColetadas[QUANTIDADE_BATERIAS] = {false};
 
     while (!WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
@@ -248,6 +295,16 @@ int main(void){
         }
 
         const bool jogadorEstaSeMovendo = Vector2DistanceSqr(jogador, posicaoAnteriorJogador) > 0.0001f;
+
+        for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
+            if (!bateriasColetadas[i] &&
+                Vector2DistanceSqr(jogador, posicoesBateria[i]) <=
+                    RAIO_COLETA_BATERIA * RAIO_COLETA_BATERIA) {
+                bateriasColetadas[i] =
+                    AdicionarItemHotbar(primeiroSlot, ITEM_BATERIA);
+                if (bateriasColetadas[i]) TocarSomColeta(&sonsJogo);
+            }
+        }
 
         if (jogadorEstaSeMovendo) {
             const float intensidadeHorizontal = fabsf(direcaoMovimento.x);
@@ -302,6 +359,22 @@ int main(void){
         const Rectangle origemMapa = {0.0f, 0.0f, (float)mapa.width, (float)mapa.height};
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+        for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
+            if (bateriasColetadas[i]) continue;
+            const float larguraBateria = TAMANHO_BATERIA_MAPA *
+                (float)bateria.width / (float)bateria.height;
+            const Rectangle origemBateria = {
+                0.0f, 0.0f, (float)bateria.width, (float)bateria.height
+            };
+            const Rectangle destinoBateria = {
+                posicoesBateria[i].x - larguraBateria * 0.5f,
+                posicoesBateria[i].y - TAMANHO_BATERIA_MAPA * 0.5f,
+                larguraBateria,
+                TAMANHO_BATERIA_MAPA
+            };
+            DrawTexturePro(bateria, origemBateria, destinoBateria,
+                           (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+        }
 
         const Texture2D spriteAtual = olhandoVertical
             ? (olhandoParaFrente
@@ -320,7 +393,7 @@ int main(void){
             DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
         EndShaderMode();
 
-        DesenharHotbar(primeiroSlot, slotSelecionado, larguraTela, alturaTela);
+        DesenharHotbar(primeiroSlot, slotSelecionado, bateria);
 
         EndDrawing();
     }
@@ -336,6 +409,7 @@ int main(void){
     UnloadTexture(spriteParadoFrente);
     UnloadTexture(spriteTras);
     UnloadTexture(spriteParadoTras);
+    UnloadTexture(bateria);
     LiberarMascaraParedes();
     UnloadTexture(telaInicial);
     UnloadTexture(mapa);
