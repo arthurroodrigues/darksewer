@@ -4,9 +4,9 @@
 #include "raylib.h"
 
 #define MAPA_LARGURA 768
-#define MAPA_ALTURA 991
+#define MAPA_ALTURA 768
 
-bool CarregarMascaraParedes(int larguraMapaFonte, int alturaMapaFonte);
+bool CarregarMascaraParedes(void);
 void LiberarMascaraParedes(void);
 bool PodeOcupar(Vector2 posicaoJogador);
 bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,

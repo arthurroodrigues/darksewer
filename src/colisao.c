@@ -14,7 +14,7 @@ static Color *pixelsMascaraParedes;
 static int larguraMascaraParedes;
 static int alturaMascaraParedes;
 
-bool CarregarMascaraParedes(int larguraMapaFonte, int alturaMapaFonte){
+bool CarregarMascaraParedes(void){
     Image imagem = LoadImage(PAREDES_ARQUIVO);
 
     if (imagem.data == NULL) {
@@ -22,13 +22,14 @@ bool CarregarMascaraParedes(int larguraMapaFonte, int alturaMapaFonte){
         return false;
     }
 
-    if (imagem.width != larguraMapaFonte ||
-        (imagem.height != alturaMapaFonte && imagem.height != alturaMapaFonte + 1)) {
-        TraceLog(LOG_ERROR, "Tamanho da mascara invalido: %d x %d; esperado %d x %d (ou uma linha extra).", imagem.width, imagem.height, larguraMapaFonte, alturaMapaFonte);
+    if (imagem.width <= 0 || imagem.height <= 0) {
+        TraceLog(LOG_ERROR, "A mascara de paredes tem dimensoes invalidas: %d x %d.", imagem.width, imagem.height);
         UnloadImage(imagem);
         return false;
     }
 
+    const int larguraMascara = imagem.width;
+    const int alturaMascara = imagem.height;
     Color *pixels = LoadImageColors(imagem);
     UnloadImage(imagem);
     if (pixels == NULL) {
@@ -36,19 +37,19 @@ bool CarregarMascaraParedes(int larguraMapaFonte, int alturaMapaFonte){
         return false;
     }
 
-    for (int y = 0; y < alturaMapaFonte; y++) {
-        for (int x = 0; x < larguraMapaFonte; x++) {
-            const int indice = y * larguraMapaFonte + x;
+    for (int y = 0; y < alturaMascara; y++) {
+        for (int x = 0; x < larguraMascara; x++) {
+            const int indice = y * larguraMascara + x;
             const Color pixel = pixels[indice];
             const unsigned int brilho =
                 (299u * pixel.r + 587u * pixel.g + 114u * pixel.b) / 1000u;
-            pixels[indice] = brilho >= 128u ? BLACK : WHITE;
+            pixels[indice] = brilho >= 128u ? WHITE : BLACK;
         }
     }
 
     pixelsMascaraParedes = pixels;
-    larguraMascaraParedes = larguraMapaFonte;
-    alturaMascaraParedes = alturaMapaFonte;
+    larguraMascaraParedes = larguraMascara;
+    alturaMascaraParedes = alturaMascara;
     return true;
 }
 

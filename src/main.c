@@ -17,12 +17,12 @@
 #define INTENSIDADE_ESCURO 0.99f
 #define TAMANHO_BATERIA_MAPA 15.0f
 #define RAIO_COLETA_BATERIA 12.5f
-#define DISTANCIA_MINIMA_SPAWN_BATERIA 96.0f
-#define DISTANCIA_MINIMA_ENTRE_BATERIAS 160.0f
+#define DISTANCIA_MINIMA_SPAWN_BATERIA 24.0f
+#define DISTANCIA_MINIMA_ENTRE_BATERIAS 32.0f
 #define QUANTIDADE_BATERIAS 3
 #define VELOCIDADE_JOGADOR 112.0f
-#define JOGADOR_INICIAL_X 96.0f
-#define JOGADOR_INICIAL_Y 816.0f
+#define JOGADOR_INICIAL_X 100.0f
+#define JOGADOR_INICIAL_Y 600.0f
 #define ARQUIVO_SPRITE_PARADO "assets\\jogador_parado.png"
 #define ARQUIVO_SPRITE_ANDANDO "assets\\jogador_andando.png"
 #define ARQUIVO_SPRITE_PARADO_ESQUERDA "assets\\jogador_parado_esquerda.png"
@@ -56,7 +56,7 @@ int main(void){
     SetTargetFPS(60);
 
     if (!FileExists(MAPA_ARQUIVO)) {
-        TraceLog(LOG_ERROR, "Nao encontrei mapa.png. Coloque-o ao lado de main.c.");
+        TraceLog(LOG_ERROR, "Nao encontrei mapa.png dentro da pasta assets.");
         CloseWindow();
         return 1;
     }
@@ -92,7 +92,7 @@ int main(void){
         return 1;
     }
 
-    if (!CarregarMascaraParedes(mapa.width, mapa.height)) {
+    if (!CarregarMascaraParedes()) {
         UnloadTexture(telaInicial);
         UnloadTexture(mapa);
         CloseWindow();
