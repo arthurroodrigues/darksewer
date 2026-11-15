@@ -13,6 +13,67 @@
 static Color *pixelsMascaraParedes;
 static int larguraMascaraParedes;
 static int alturaMascaraParedes;
+static unsigned char *gradeLivre;
+static int *distanciasGrade;
+static int *filaGrade;
+static int colunasGrade;
+static int linhasGrade;
+
+static Vector2 CentroCelula(int indice){
+    return (Vector2){
+        (float)(indice % colunasGrade) * PASSO_GRADE_ACESSIBILIDADE,
+        (float)(indice / colunasGrade) * PASSO_GRADE_ACESSIBILIDADE
+    };
+}
+
+static bool CriarGradeCaminhada(void){
+    colunasGrade = (int)((float)MAPA_LARGURA / PASSO_GRADE_ACESSIBILIDADE) + 1;
+    linhasGrade = (int)((float)MAPA_ALTURA / PASSO_GRADE_ACESSIBILIDADE) + 1;
+    const int totalCelulas = colunasGrade * linhasGrade;
+    gradeLivre = malloc((size_t)totalCelulas * sizeof(*gradeLivre));
+    distanciasGrade = malloc((size_t)totalCelulas * sizeof(*distanciasGrade));
+    filaGrade = malloc((size_t)totalCelulas * sizeof(*filaGrade));
+
+    if (gradeLivre == NULL || distanciasGrade == NULL || filaGrade == NULL) {
+        TraceLog(LOG_ERROR, "Falha ao alocar memoria para a grade de caminhada.");
+        LiberarMascaraParedes();
+        return false;
+    }
+
+    for (int i = 0; i < totalCelulas; i++) {
+        gradeLivre[i] = PodeOcupar(CentroCelula(i));
+        distanciasGrade[i] = -1;
+    }
+    return true;
+}
+
+static int CelulaLivreMaisProxima(Vector2 posicao){
+    if (gradeLivre == NULL) return -1;
+
+    const int x = (int)roundf(posicao.x / PASSO_GRADE_ACESSIBILIDADE);
+    const int y = (int)roundf(posicao.y / PASSO_GRADE_ACESSIBILIDADE);
+    int melhor = -1;
+    float melhorDistancia = 0.0f;
+
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            const int vizinhoX = x + dx;
+            const int vizinhoY = y + dy;
+            if (vizinhoX < 0 || vizinhoX >= colunasGrade ||
+                vizinhoY < 0 || vizinhoY >= linhasGrade) continue;
+
+            const int indice = vizinhoY * colunasGrade + vizinhoX;
+            if (!gradeLivre[indice]) continue;
+
+            const float distancia = Vector2DistanceSqr(posicao, CentroCelula(indice));
+            if (melhor < 0 || distancia < melhorDistancia) {
+                melhor = indice;
+                melhorDistancia = distancia;
+            }
+        }
+    }
+    return melhor;
+}
 
 bool CarregarMascaraParedes(void){
     Image imagem = LoadImage(PAREDES_ARQUIVO);
@@ -50,10 +111,17 @@ bool CarregarMascaraParedes(void){
     pixelsMascaraParedes = pixels;
     larguraMascaraParedes = larguraMascara;
     alturaMascaraParedes = alturaMascara;
-    return true;
+    return CriarGradeCaminhada();
 }
 
 void LiberarMascaraParedes(void){
+    free(gradeLivre);
+    free(distanciasGrade);
+    free(filaGrade);
+    gradeLivre = NULL;
+    distanciasGrade = NULL;
+    filaGrade = NULL;
+
     if (pixelsMascaraParedes == NULL) return;
     UnloadImageColors(pixelsMascaraParedes);
     pixelsMascaraParedes = NULL;
@@ -123,18 +191,14 @@ bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
         return false;
     }
 
-    const int origemX = (int)roundf(origem.x / PASSO_GRADE_ACESSIBILIDADE);
-    const int origemY = (int)roundf(origem.y / PASSO_GRADE_ACESSIBILIDADE);
-    if (origemX < 0 || origemX >= colunas || origemY < 0 || origemY >= linhas ||
-        !PodeOcupar((Vector2){origemX * PASSO_GRADE_ACESSIBILIDADE,
-                              origemY * PASSO_GRADE_ACESSIBILIDADE})) {
+    const int indiceOrigem = CelulaLivreMaisProxima(origem);
+    if (indiceOrigem < 0) {
         TraceLog(LOG_ERROR, "A origem da busca por posicao acessivel esta bloqueada.");
         free(fila);
         free(visitadas);
         return false;
     }
 
-    const int indiceOrigem = origemY * colunas + origemX;
     int inicioFila = 0;
     int fimFila = 0;
     fila[fimFila++] = indiceOrigem;
@@ -156,11 +220,7 @@ bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
                 vizinhoY >= linhas || visitadas[vizinho]) continue;
 
             visitadas[vizinho] = 1;
-            const Vector2 candidata = {
-                (float)vizinhoX * PASSO_GRADE_ACESSIBILIDADE,
-                (float)vizinhoY * PASSO_GRADE_ACESSIBILIDADE
-            };
-            if (!PodeOcupar(candidata)) continue;
+            if (!gradeLivre[vizinho]) continue;
             fila[fimFila++] = vizinho;
         }
     }
@@ -230,4 +290,83 @@ Vector2 MoverComColisao(Vector2 posicaoJogador, Vector2 deslocamentoJogador){
         if (PodeOcupar(posicaoTentativaY)) posicaoJogador.y = posicaoTentativaY.y;
     }
     return posicaoJogador;
+}
+
+// limitacao: existe um unico mapa de distancias, entao so serve a um inimigo por vez.
+bool AtualizarMapaDistancias(Vector2 alvo){
+    const int origem = CelulaLivreMaisProxima(alvo);
+    if (origem < 0) return false;
+
+    const int totalCelulas = colunasGrade * linhasGrade;
+    for (int i = 0; i < totalCelulas; i++) distanciasGrade[i] = -1;
+
+    int inicioFila = 0;
+    int fimFila = 0;
+    filaGrade[fimFila++] = origem;
+    distanciasGrade[origem] = 0;
+
+    while (inicioFila < fimFila) {
+        const int indice = filaGrade[inicioFila++];
+        const int x = indice % colunasGrade;
+        const int y = indice / colunasGrade;
+        const int vizinhos[4] = {indice - 1, indice + 1, indice - colunasGrade, indice + colunasGrade};
+        const bool dentroDaGrade[4] = {x > 0, x < colunasGrade - 1, y > 0, y < linhasGrade - 1};
+
+        for (int i = 0; i < 4; i++) {
+            if (!dentroDaGrade[i] || !gradeLivre[vizinhos[i]] ||
+                distanciasGrade[vizinhos[i]] >= 0) continue;
+            distanciasGrade[vizinhos[i]] = distanciasGrade[indice] + 1;
+            filaGrade[fimFila++] = vizinhos[i];
+        }
+    }
+    return true;
+}
+
+Vector2 ProximoPontoNoCaminho(Vector2 posicao){
+    const int celula = CelulaLivreMaisProxima(posicao);
+    if (celula < 0 || distanciasGrade[celula] < 0) return posicao;
+    if (distanciasGrade[celula] == 0) return CentroCelula(celula);
+
+    const int x = celula % colunasGrade;
+    const int y = celula / colunasGrade;
+    int melhor = celula;
+
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            const int vizinhoX = x + dx;
+            const int vizinhoY = y + dy;
+            if (vizinhoX < 0 || vizinhoX >= colunasGrade ||
+                vizinhoY < 0 || vizinhoY >= linhasGrade) continue;
+
+            const int vizinho = vizinhoY * colunasGrade + vizinhoX;
+            if (distanciasGrade[vizinho] < 0 ||
+                distanciasGrade[vizinho] >= distanciasGrade[melhor]) continue;
+
+            // diagonal so vale quando nao corta a quina de uma parede
+            if (dx != 0 && dy != 0 &&
+                (!gradeLivre[y * colunasGrade + vizinhoX] ||
+                 !gradeLivre[vizinhoY * colunasGrade + x])) continue;
+            melhor = vizinho;
+        }
+    }
+    return CentroCelula(melhor);
+}
+
+bool ChegouAoAlvoDoMapa(Vector2 posicao){
+    const int celula = CelulaLivreMaisProxima(posicao);
+    return celula >= 0 && distanciasGrade[celula] == 0;
+}
+
+bool LinhaLivre(Vector2 origem, Vector2 destino){
+    const float escalaMascaraX = (float)larguraMascaraParedes / (float)MAPA_LARGURA;
+    const float escalaMascaraY = (float)alturaMascaraParedes / (float)MAPA_ALTURA;
+    const float alturaPes = DESLOCAMENTO_HITBOX_PES_Y + ALTURA_HITBOX_PES * 0.5f;
+    const int amostras = (int)ceilf(Vector2Distance(origem, destino) * 2.0f) + 1;
+
+    for (int i = 0; i <= amostras; i++) {
+        const Vector2 ponto = Vector2Lerp(origem, destino, (float)i / (float)amostras);
+        if (PixelParede((int)(ponto.x * escalaMascaraX),
+                        (int)((ponto.y - alturaPes) * escalaMascaraY))) return false;
+    }
+    return true;
 }

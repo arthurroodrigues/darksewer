@@ -15,5 +15,9 @@ bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
                                         float distanciaMinimaEntrePosicoes,
                                         Vector2 *posicao);
 Vector2 MoverComColisao(Vector2 posicaoJogador, Vector2 deslocamentoJogador);
+bool AtualizarMapaDistancias(Vector2 alvo);
+Vector2 ProximoPontoNoCaminho(Vector2 posicao);
+bool ChegouAoAlvoDoMapa(Vector2 posicao);
+bool LinhaLivre(Vector2 origem, Vector2 destino);
 
 #endif
