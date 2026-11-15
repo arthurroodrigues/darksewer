@@ -22,6 +22,8 @@
 #define DISTANCIA_MINIMA_ENTRE_BATERIAS 32.0f
 #define QUANTIDADE_BATERIAS 3
 #define VELOCIDADE_JOGADOR 112.0f
+#define VIDAS_INICIAIS 3
+#define TEMPO_INVULNERAVEL 2.0f
 #define JOGADOR_INICIAL_X 100.0f
 #define JOGADOR_INICIAL_Y 600.0f
 #define ARQUIVO_SPRITE_PARADO "assets\\jogador_parado.png"
@@ -63,6 +65,8 @@ typedef struct {
     bool bateriasColetadas[QUANTIDADE_BATERIAS];
     Lanterna lanterna;
     Inimigo inimigo;
+    int vidas;
+    float tempoInvulneravel;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
     bool olhandoEsquerda;
@@ -75,6 +79,7 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
     *partida = (Partida){0};
     partida->jogador = (Vector2){JOGADOR_INICIAL_X, JOGADOR_INICIAL_Y};
     partida->lanterna = CriarLanterna();
+    partida->vidas = VIDAS_INICIAIS;
     partida->slotSelecionado = primeiroSlot;
     EsvaziarHotbar(primeiroSlot);
 
@@ -151,6 +156,15 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 
     AtualizarInimigo(&partida->inimigo, partida->jogador,
                      LanternaAcesa(&partida->lanterna), deltaTempo);
+
+    partida->tempoInvulneravel = fmaxf(partida->tempoInvulneravel - deltaTempo, 0.0f);
+    if (partida->tempoInvulneravel <= 0.0f &&
+        InimigoPegouJogador(&partida->inimigo, partida->jogador)) {
+        partida->vidas--;
+        if (partida->vidas > 0) partida->tempoInvulneravel = TEMPO_INVULNERAVEL;
+        AfastarInimigo(&partida->inimigo);
+    }
+
     AtualizarPassos(sons, teclasMovimentoPressionadas);
 }
 
@@ -371,12 +385,18 @@ int main(void){
 
         if (estado == ESTADO_JOGANDO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
-            if (InimigoPegouJogador(&partida.inimigo, partida.jogador)) estado = ESTADO_FIM;
+            if (partida.vidas <= 0) estado = ESTADO_FIM;
         } else {
             AtualizarPassos(&sonsJogo, false);
             if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
-            if ((estado == ESTADO_PAUSADO && IsKeyPressed(KEY_M)) ||
-                (estado == ESTADO_FIM && IsKeyPressed(KEY_ENTER))) {
+            if (estado == ESTADO_FIM && IsKeyPressed(KEY_ENTER)) {
+                if (!IniciarPartida(&partida, primeiroSlot)) {
+                    codigoSaida = 1;
+                    break;
+                }
+                estado = ESTADO_JOGANDO;
+            }
+            if (IsKeyPressed(KEY_M)) {
                 estado = ESTADO_MENU;
                 if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
                 BeginDrawing();
@@ -439,7 +459,10 @@ int main(void){
             : (partida.olhandoEsquerda
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
-        DesenharJogador(partida.jogador, spriteAtual);
+        // pisca enquanto esta invulneravel depois de um golpe
+        const bool jogadorOculto = estado == ESTADO_JOGANDO &&
+            fmodf(partida.tempoInvulneravel, 0.2f) >= 0.1f;
+        if (!jogadorOculto) DesenharJogador(partida.jogador, spriteAtual);
         if (!inimigoAtras) DesenharInimigo(&partida.inimigo);
 
         EndMode2D();
@@ -450,6 +473,7 @@ int main(void){
 
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
+        DesenharVidas(partida.vidas, VIDAS_INICIAIS, larguraTela);
         if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
         if (estado == ESTADO_FIM) DesenharTelaFim(larguraTela, alturaTela);
 

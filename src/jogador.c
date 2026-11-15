@@ -18,3 +18,20 @@ void DesenharPersonagem(Vector2 posicao, Texture2D sprite, float alturaNoMapa, b
 void DesenharJogador(Vector2 posicaoJogador, Texture2D spriteJogador){
     DesenharPersonagem(posicaoJogador, spriteJogador, ALTURA_SPRITE_JOGADOR, false);
 }
+
+void DesenharVidas(int vidas, int vidasMaximas, int larguraTela){
+    const float raio = 6.0f;
+
+    for (int i = 0; i < vidasMaximas; i++) {
+        const float x = (float)larguraTela - 32.0f - (float)i * 30.0f;
+        const float y = 54.0f;
+        const Color cor = i < vidas ? (Color){170, 52, 40, 255} : (Color){40, 46, 44, 255};
+
+        // coracao: dois circulos em cima e um triangulo fechando embaixo
+        DrawCircleV((Vector2){x - raio * 0.85f, y}, raio, cor);
+        DrawCircleV((Vector2){x + raio * 0.85f, y}, raio, cor);
+        DrawTriangle((Vector2){x - raio * 1.8f, y + raio * 0.35f},
+                     (Vector2){x, y + raio * 2.3f},
+                     (Vector2){x + raio * 1.8f, y + raio * 0.35f}, cor);
+    }
+}
