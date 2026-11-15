@@ -3,7 +3,7 @@
 
 #include "raylib.h"
 
-void DesenharPersonagem(Vector2 posicao, Texture2D sprite, Color cor);
+void DesenharPersonagem(Vector2 posicao, Texture2D sprite, float alturaNoMapa, bool espelhado);
 void DesenharJogador(Vector2 posicaoJogador, Texture2D spriteJogador);
 
 #endif

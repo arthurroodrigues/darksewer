@@ -332,9 +332,9 @@ int main(void){
         return 1;
     }
     Partida partida = {0};
-    int codigoSaida = 0;
+    int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
 
-    while (!WindowShouldClose()) {
+    while (codigoSaida == 0 && !WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
         const int larguraTela = GetScreenWidth();
         const int alturaTela = GetScreenHeight();
@@ -428,16 +428,9 @@ int main(void){
                            (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         }
 
-        // sprite provisorio: usa os do jogador em vermelho ate a arte do inimigo existir.
-        const Inimigo *inimigo = &partida.inimigo;
-        const Texture2D spriteInimigo = inimigo->olhandoVertical
-            ? (inimigo->olhandoParaFrente
-                ? (inimigo->quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
-                : (inimigo->quadroAnimacaoAndando ? spriteTras : spriteParadoTras))
-            : (inimigo->olhandoEsquerda
-                ? (inimigo->quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
-                : (inimigo->quadroAnimacaoAndando ? spriteAndando : spriteParado));
-        DesenharPersonagem(inimigo->posicao, spriteInimigo, (Color){255, 80, 80, 255});
+        // quem esta mais abaixo na tela fica na frente
+        const bool inimigoAtras = partida.inimigo.posicao.y <= partida.jogador.y;
+        if (inimigoAtras) DesenharInimigo(&partida.inimigo);
 
         const Texture2D spriteAtual = partida.olhandoVertical
             ? (partida.olhandoParaFrente
@@ -447,6 +440,7 @@ int main(void){
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
         DesenharJogador(partida.jogador, spriteAtual);
+        if (!inimigoAtras) DesenharInimigo(&partida.inimigo);
 
         EndMode2D();
 
@@ -462,6 +456,7 @@ int main(void){
         EndDrawing();
     }
 
+    LiberarSpritesInimigo();
     LiberarHotbar(primeiroSlot);
     UnloadShader(shaderLanterna);
     LiberarSons(&sonsJogo);

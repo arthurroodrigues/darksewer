@@ -1,5 +1,6 @@
 #include "inimigo.h"
 #include "colisao.h"
+#include "jogador.h"
 #include "raymath.h"
 #include <math.h>
 #include <stddef.h>
@@ -14,6 +15,47 @@
 #define DISTANCIA_MINIMA_NASCIMENTO 250.0f
 #define DISTANCIA_MINIMA_PATRULHA 80.0f
 #define INTERVALO_ANIMACAO_INIMIGO 0.18f
+#define ALTURA_SPRITE_INIMIGO 34.0f
+#define QUANTIDADE_SPRITES_INIMIGO 6
+
+// ordem: de lado, de frente e de costas; em cada par, parado e andando
+static const char *const kArquivosSprites[QUANTIDADE_SPRITES_INIMIGO] = {
+    "assets\\inimigo_parado.png",
+    "assets\\inimigo_andando.png",
+    "assets\\inimigo_parado_para_frente.png",
+    "assets\\inimigo_andando_para_frente.png",
+    "assets\\inimigo_parado_para_tras.png",
+    "assets\\inimigo_andando_para_tras.png"
+};
+static Texture2D sprites[QUANTIDADE_SPRITES_INIMIGO];
+
+bool CarregarSpritesInimigo(void){
+    for (int i = 0; i < QUANTIDADE_SPRITES_INIMIGO; i++) {
+        sprites[i] = LoadTexture(kArquivosSprites[i]);
+        if (sprites[i].id == 0) {
+            TraceLog(LOG_ERROR, "Falha ao carregar o sprite do inimigo: %s", kArquivosSprites[i]);
+            LiberarSpritesInimigo();
+            return false;
+        }
+        SetTextureFilter(sprites[i], TEXTURE_FILTER_POINT);
+    }
+    return true;
+}
+
+void LiberarSpritesInimigo(void){
+    for (int i = 0; i < QUANTIDADE_SPRITES_INIMIGO; i++) {
+        if (sprites[i].id != 0) UnloadTexture(sprites[i]);
+        sprites[i] = (Texture2D){0};
+    }
+}
+
+void DesenharInimigo(const Inimigo *inimigo){
+    const int direcao = !inimigo->olhandoVertical ? 0 : (inimigo->olhandoParaFrente ? 2 : 4);
+    const Texture2D sprite = sprites[direcao + (inimigo->quadroAnimacaoAndando ? 1 : 0)];
+    // os sprites de lado olham para a direita; para a esquerda, espelha
+    const bool espelhado = !inimigo->olhandoVertical && inimigo->olhandoEsquerda;
+    DesenharPersonagem(inimigo->posicao, sprite, ALTURA_SPRITE_INIMIGO, espelhado);
+}
 
 static void EscolherAlvoPatrulha(Inimigo *inimigo){
     Vector2 alvo;
