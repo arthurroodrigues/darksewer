@@ -6,8 +6,10 @@
 #include "jogador.h"
 #include "lanterna.h"
 #include "inimigo.h"
+#include "ranking.h"
 #include "raymath.h"
 #include <math.h>
+#include <stdio.h>
 #include <time.h>
 
 #define MAPA_ARQUIVO "assets\\mapa.png"
@@ -43,6 +45,7 @@
 #define ARQUIVO_SPRITE_PARADO_TRAS "assets\\jogador_parado_para_tras.png"
 #define LARGURA_JANELA 960
 #define ALTURA_JANELA 720
+#define ARQUIVO_RANKING "ranking.txt"
 
 // porta da sala do bueiro, por onde o jogador escapa
 static const Rectangle kZonaPorta = {478.0f, 502.0f, 28.0f, 8.0f};
@@ -69,7 +72,8 @@ typedef enum {
     ESTADO_JOGANDO,
     ESTADO_PAUSADO,
     ESTADO_FIM,
-    ESTADO_VITORIA
+    ESTADO_VITORIA,
+    ESTADO_RANKING
 } EstadoJogo;
 
 typedef struct {
@@ -84,6 +88,7 @@ typedef struct {
     Inimigo inimigo;
     int vidas;
     float tempoInvulneravel;
+    float tempoPartida;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
     bool olhandoEsquerda;
@@ -117,6 +122,8 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
 }
 
 static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, float deltaTempo){
+    partida->tempoPartida += deltaTempo;
+
     if (IsKeyPressed(KEY_E) || GetMouseWheelMove() < 0.0f) partida->slotSelecionado = partida->slotSelecionado->proximo;
     if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) partida->slotSelecionado = partida->slotSelecionado->anterior;
 
@@ -395,6 +402,14 @@ int main(void){
     Partida partida = {0};
     int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
 
+    char caminhoRanking[512];
+    snprintf(caminhoRanking, sizeof(caminhoRanking), "%s%s", GetApplicationDirectory(), ARQUIVO_RANKING);
+    RegistroRanking *ranking = CarregarRanking(caminhoRanking);
+    const RegistroRanking *registroNovo = NULL;
+    char nomeJogador[TAMANHO_NOME_RANKING + 1] = "";
+    int tamanhoNome = 0;
+    bool digitacaoLiberada = false;
+
     while (codigoSaida == 0 && !WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
         const int larguraTela = GetScreenWidth();
@@ -418,10 +433,37 @@ int main(void){
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
 
-            if (audioDisponivel && estado == ESTADO_MENU) UpdateMusicStream(sonsJogo.musicaFundo);
+            if (estado == ESTADO_MENU && IsKeyPressed(KEY_R)) {
+                estado = ESTADO_RANKING;
+                registroNovo = NULL;
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+
+            if (audioDisponivel && estado != ESTADO_JOGANDO) UpdateMusicStream(sonsJogo.musicaFundo);
 
             BeginDrawing();
             DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
+            EndDrawing();
+            continue;
+        }
+
+        if (estado == ESTADO_RANKING) {
+            if (IsKeyPressed(KEY_ENTER)) {
+                if (!IniciarPartida(&partida, primeiroSlot)) {
+                    codigoSaida = 1;
+                    break;
+                }
+                estado = ESTADO_JOGANDO;
+                if (audioDisponivel) StopMusicStream(sonsJogo.musicaFundo);
+            } else if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_ESCAPE)) {
+                estado = ESTADO_MENU;
+            }
+
+            if (audioDisponivel && estado != ESTADO_JOGANDO) UpdateMusicStream(sonsJogo.musicaFundo);
+
+            BeginDrawing();
+            DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
+            DesenharRanking(ranking, registroNovo, larguraTela, alturaTela);
             EndDrawing();
             continue;
         }
@@ -434,18 +476,56 @@ int main(void){
         if (estado == ESTADO_JOGANDO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
             if (partida.vidas <= 0) estado = ESTADO_FIM;
-            else if (partida.escapou) estado = ESTADO_VITORIA;
+            else if (partida.escapou) {
+                estado = ESTADO_VITORIA;
+                nomeJogador[0] = '\0';
+                tamanhoNome = 0;
+                digitacaoLiberada = false;
+            }
         } else {
             AtualizarPassos(&sonsJogo, false);
             if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
-            if ((estado == ESTADO_FIM || estado == ESTADO_VITORIA) && IsKeyPressed(KEY_ENTER)) {
+            if (estado == ESTADO_VITORIA) {
+                // so comeca a digitar depois de soltar as teclas de andar, para elas nao entrarem no nome
+                if (!digitacaoLiberada) {
+                    digitacaoLiberada = !IsKeyDown(KEY_W) && !IsKeyDown(KEY_A) &&
+                                        !IsKeyDown(KEY_S) && !IsKeyDown(KEY_D);
+                }
+
+                for (int letra = GetCharPressed(); letra > 0; letra = GetCharPressed()) {
+                    if (letra >= 'a' && letra <= 'z') letra -= 'a' - 'A';
+                    const bool letraValida = (letra >= 'A' && letra <= 'Z') ||
+                                             (letra >= '0' && letra <= '9') || letra == ' ';
+                    if (digitacaoLiberada && letraValida && tamanhoNome < TAMANHO_NOME_RANKING) {
+                        nomeJogador[tamanhoNome++] = (char)letra;
+                        nomeJogador[tamanhoNome] = '\0';
+                    }
+                }
+                if (IsKeyPressed(KEY_BACKSPACE) && tamanhoNome > 0) nomeJogador[--tamanhoNome] = '\0';
+
+                if (IsKeyPressed(KEY_ENTER)) {
+                    registroNovo = InserirNoRanking(&ranking, tamanhoNome > 0 ? nomeJogador : "ANONIMO",
+                                                    partida.tempoPartida);
+                    if (!SalvarRanking(ranking, caminhoRanking)) {
+                        TraceLog(LOG_WARNING, "Nao foi possivel salvar o ranking em %s", caminhoRanking);
+                    }
+                    estado = ESTADO_RANKING;
+                    if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
+                    BeginDrawing();
+                    DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
+                    DesenharRanking(ranking, registroNovo, larguraTela, alturaTela);
+                    EndDrawing();
+                    continue;
+                }
+            }
+            if (estado == ESTADO_FIM && IsKeyPressed(KEY_ENTER)) {
                 if (!IniciarPartida(&partida, primeiroSlot)) {
                     codigoSaida = 1;
                     break;
                 }
                 estado = ESTADO_JOGANDO;
             }
-            if (IsKeyPressed(KEY_M)) {
+            if (estado != ESTADO_VITORIA && IsKeyPressed(KEY_M)) {
                 estado = ESTADO_MENU;
                 if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
                 BeginDrawing();
@@ -536,6 +616,9 @@ int main(void){
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
         DesenharVidas(partida.vidas, VIDAS_INICIAIS, larguraTela);
 
+        const char *relogio = FormatarTempo(partida.tempoPartida);
+        DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
+
         if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
             Vector2DistanceSqr(partida.jogador, kCentroPorta) <= RAIO_PORTA * RAIO_PORTA) {
             const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
@@ -546,11 +629,14 @@ int main(void){
 
         if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
         if (estado == ESTADO_FIM) DesenharTelaFim(larguraTela, alturaTela);
-        if (estado == ESTADO_VITORIA) DesenharTelaVitoria(larguraTela, alturaTela);
+        if (estado == ESTADO_VITORIA) {
+            DesenharTelaVitoria(larguraTela, alturaTela, partida.tempoPartida, nomeJogador);
+        }
 
         EndDrawing();
     }
 
+    LiberarRanking(ranking);
     LiberarSpritesInimigo();
     LiberarHotbar(primeiroSlot);
     UnloadShader(shaderLanterna);
