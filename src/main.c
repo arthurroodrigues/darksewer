@@ -5,6 +5,7 @@
 #include "menu.h"
 #include "jogador.h"
 #include "lanterna.h"
+#include "inimigo.h"
 #include "raymath.h"
 #include <math.h>
 #include <time.h>
@@ -52,7 +53,8 @@ static const char *kShaderLanterna =
 typedef enum {
     ESTADO_MENU,
     ESTADO_JOGANDO,
-    ESTADO_PAUSADO
+    ESTADO_PAUSADO,
+    ESTADO_FIM
 } EstadoJogo;
 
 typedef struct {
@@ -60,6 +62,7 @@ typedef struct {
     Vector2 posicoesBateria[QUANTIDADE_BATERIAS];
     bool bateriasColetadas[QUANTIDADE_BATERIAS];
     Lanterna lanterna;
+    Inimigo inimigo;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
     bool olhandoEsquerda;
@@ -81,7 +84,7 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
                 partida->posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
                 &partida->posicoesBateria[i])) return false;
     }
-    return true;
+    return PosicionarInimigo(&partida->inimigo, partida->jogador);
 }
 
 static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, float deltaTempo){
@@ -146,6 +149,8 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
         partida->quadroAnimacaoAndando = false;
     }
 
+    AtualizarInimigo(&partida->inimigo, partida->jogador,
+                     LanternaAcesa(&partida->lanterna), deltaTempo);
     AtualizarPassos(sons, teclasMovimentoPressionadas);
 }
 
@@ -360,20 +365,25 @@ int main(void){
             continue;
         }
 
-        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P)) {
+        if (estado != ESTADO_FIM && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))) {
             estado = (estado == ESTADO_JOGANDO) ? ESTADO_PAUSADO : ESTADO_JOGANDO;
         }
 
-        if (estado == ESTADO_PAUSADO) {
+        if (estado == ESTADO_JOGANDO) {
+            AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
+            if (InimigoPegouJogador(&partida.inimigo, partida.jogador)) estado = ESTADO_FIM;
+        } else {
             AtualizarPassos(&sonsJogo, false);
-            if (IsKeyPressed(KEY_Q)) break;
-            if (IsKeyPressed(KEY_M)) {
+            if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
+            if ((estado == ESTADO_PAUSADO && IsKeyPressed(KEY_M)) ||
+                (estado == ESTADO_FIM && IsKeyPressed(KEY_ENTER))) {
                 estado = ESTADO_MENU;
                 if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
+                BeginDrawing();
+                DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
+                EndDrawing();
                 continue;
             }
-        } else {
-            AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
         }
 
         camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
@@ -418,6 +428,17 @@ int main(void){
                            (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         }
 
+        // sprite provisorio: usa os do jogador em vermelho ate a arte do inimigo existir.
+        const Inimigo *inimigo = &partida.inimigo;
+        const Texture2D spriteInimigo = inimigo->olhandoVertical
+            ? (inimigo->olhandoParaFrente
+                ? (inimigo->quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
+                : (inimigo->quadroAnimacaoAndando ? spriteTras : spriteParadoTras))
+            : (inimigo->olhandoEsquerda
+                ? (inimigo->quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
+                : (inimigo->quadroAnimacaoAndando ? spriteAndando : spriteParado));
+        DesenharPersonagem(inimigo->posicao, spriteInimigo, (Color){255, 80, 80, 255});
+
         const Texture2D spriteAtual = partida.olhandoVertical
             ? (partida.olhandoParaFrente
                 ? (partida.quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
@@ -436,6 +457,7 @@ int main(void){
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
         if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
+        if (estado == ESTADO_FIM) DesenharTelaFim(larguraTela, alturaTela);
 
         EndDrawing();
     }
