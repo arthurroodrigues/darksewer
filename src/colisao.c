@@ -9,6 +9,7 @@
 #define ALTURA_HITBOX_PES 2.0f
 #define DESLOCAMENTO_HITBOX_PES_Y 2.0f
 #define PASSO_GRADE_ACESSIBILIDADE 2.0f
+#define ESPESSURA_MAXIMA_DEGRAU 4
 
 static Color *pixelsMascaraParedes;
 static int larguraMascaraParedes;
@@ -75,6 +76,42 @@ static int CelulaLivreMaisProxima(Vector2 posicao){
     return melhor;
 }
 
+// Na mascara, as linhas dos degraus das escadas saem como parede e fecham a passagem.
+// Parede com poucos pixels de espessura e chao dos dois lados passa a ser chao.
+static bool RemoverParedesFinas(Color *pixels, int largura, int altura){
+    unsigned char *fina = calloc((size_t)largura * (size_t)altura, sizeof(*fina));
+    if (fina == NULL) return false;
+
+    for (int eixo = 0; eixo < 2; eixo++) {
+        const bool vertical = eixo == 0;
+        const int quantidadeFaixas = vertical ? largura : altura;
+        const int comprimento = vertical ? altura : largura;
+        const int passo = vertical ? largura : 1;
+
+        for (int faixa = 0; faixa < quantidadeFaixas; faixa++) {
+            const int base = vertical ? faixa : faixa * largura;
+            int inicioParede = -1;
+
+            for (int i = 0; i < comprimento; i++) {
+                if (pixels[base + i * passo].r < 128) {
+                    if (inicioParede < 0) inicioParede = i;
+                    continue;
+                }
+                if (inicioParede > 0 && i - inicioParede <= ESPESSURA_MAXIMA_DEGRAU) {
+                    for (int j = inicioParede; j < i; j++) fina[base + j * passo] = 1;
+                }
+                inicioParede = -1;
+            }
+        }
+    }
+
+    for (int i = 0; i < largura * altura; i++) {
+        if (fina[i]) pixels[i] = WHITE;
+    }
+    free(fina);
+    return true;
+}
+
 bool CarregarMascaraParedes(void){
     Image imagem = LoadImage(PAREDES_ARQUIVO);
 
@@ -106,6 +143,12 @@ bool CarregarMascaraParedes(void){
                 (299u * pixel.r + 587u * pixel.g + 114u * pixel.b) / 1000u;
             pixels[indice] = brilho >= 128u ? WHITE : BLACK;
         }
+    }
+
+    if (!RemoverParedesFinas(pixels, larguraMascara, alturaMascara)) {
+        TraceLog(LOG_ERROR, "Falha ao alocar memoria para tratar a mascara de paredes.");
+        UnloadImageColors(pixels);
+        return false;
     }
 
     pixelsMascaraParedes = pixels;
