@@ -78,6 +78,31 @@ void EsvaziarHotbar(loot *primeiro){
     }
 }
 
+int ContarItemHotbar(loot *primeiro, ItemHotbar item){
+    if (primeiro == NULL) return 0;
+
+    int total = 0;
+    loot *no = primeiro;
+    for (int i = 0; i < 5; i++) {
+        if (no->item == item) total += no->quantidade;
+        no = no->proximo;
+    }
+    return total;
+}
+
+void RemoverTodosDoItemHotbar(loot *primeiro, ItemHotbar item){
+    if (primeiro == NULL) return;
+
+    loot *no = primeiro;
+    for (int i = 0; i < 5; i++) {
+        if (no->item == item) {
+            no->item = ITEM_NENHUM;
+            no->quantidade = 0;
+        }
+        no = no->proximo;
+    }
+}
+
 void LiberarHotbar(loot *primeiro){
     if (primeiro == NULL) return;
 
@@ -101,6 +126,10 @@ void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria){
         const bool ativo = (no == selecionado);
 
         DrawRectangle(x, y, tamanho, tamanho, (Color){10, 16, 15, 200});
+        if (no->item == ITEM_CHAVE) {
+            DesenharChave((Vector2){(float)x + (float)tamanho * 0.5f, (float)y + (float)tamanho * 0.5f},
+                          (float)tamanho * 0.6f);
+        }
         if (no->item == ITEM_BATERIA && bateria.id != 0) {
             const float areaDisponivel = (float)tamanho - 8.0f;
             const float escalaLargura = areaDisponivel / (float)bateria.width;
@@ -126,4 +155,18 @@ void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria){
         DrawRectangleLinesEx((Rectangle){x, y, tamanho, tamanho}, ativo ? 3 : 2, ativo ? (Color){150, 112, 72, 255} : (Color){74, 88, 82, 255});
         no = no->proximo;
     }
+}
+
+// Chave desenhada com formas: argola a esquerda, haste e dois dentes.
+void DesenharChave(Vector2 centro, float tamanho){
+    const Color cor = {212, 175, 55, 255};
+    const float raio = tamanho * 0.22f;
+    const float espessura = tamanho * 0.12f;
+    const Vector2 argola = {centro.x - tamanho * 0.28f, centro.y};
+
+    DrawRing(argola, raio - espessura, raio, 0.0f, 360.0f, 24, cor);
+    DrawRectangleRec((Rectangle){argola.x + raio - espessura * 0.5f, centro.y - espessura * 0.5f,
+                                 tamanho * 0.56f, espessura}, cor);
+    DrawRectangleRec((Rectangle){centro.x + tamanho * 0.22f, centro.y, espessura, tamanho * 0.2f}, cor);
+    DrawRectangleRec((Rectangle){centro.x + tamanho * 0.38f, centro.y, espessura, tamanho * 0.16f}, cor);
 }

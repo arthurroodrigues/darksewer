@@ -19,12 +19,18 @@ static int *distanciasGrade;
 static int *filaGrade;
 static int colunasGrade;
 static int linhasGrade;
+static Rectangle zonaBloqueada;
 
 static Vector2 CentroCelula(int indice){
     return (Vector2){
         (float)(indice % colunasGrade) * PASSO_GRADE_ACESSIBILIDADE,
         (float)(indice / colunasGrade) * PASSO_GRADE_ACESSIBILIDADE
     };
+}
+
+static void PreencherGradeCaminhada(void){
+    const int totalCelulas = colunasGrade * linhasGrade;
+    for (int i = 0; i < totalCelulas; i++) gradeLivre[i] = PodeOcupar(CentroCelula(i));
 }
 
 static bool CriarGradeCaminhada(void){
@@ -41,10 +47,8 @@ static bool CriarGradeCaminhada(void){
         return false;
     }
 
-    for (int i = 0; i < totalCelulas; i++) {
-        gradeLivre[i] = PodeOcupar(CentroCelula(i));
-        distanciasGrade[i] = -1;
-    }
+    for (int i = 0; i < totalCelulas; i++) distanciasGrade[i] = -1;
+    PreencherGradeCaminhada();
     return true;
 }
 
@@ -186,6 +190,10 @@ bool PodeOcupar(Vector2 posicaoJogador){
 
     if (esquerda < 0.0f || topo < 0.0f ||
         direita > MAPA_LARGURA || base > MAPA_ALTURA) return false;
+
+    if (zonaBloqueada.width > 0.0f &&
+        CheckCollisionRecs((Rectangle){esquerda, topo, direita - esquerda, base - topo},
+                           zonaBloqueada)) return false;
 
     const float escalaMascaraX = (float)larguraMascaraParedes / (float)MAPA_LARGURA;
     const float escalaMascaraY = (float)alturaMascaraParedes / (float)MAPA_ALTURA;
@@ -412,4 +420,10 @@ bool LinhaLivre(Vector2 origem, Vector2 destino){
                         (int)((ponto.y - alturaPes) * escalaMascaraY))) return false;
     }
     return true;
+}
+
+// Fecha uma area do mapa (porta trancada). Largura zero libera de novo.
+void DefinirZonaBloqueada(Rectangle zona){
+    zonaBloqueada = zona;
+    if (gradeLivre != NULL) PreencherGradeCaminhada();
 }

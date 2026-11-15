@@ -19,5 +19,6 @@ bool AtualizarMapaDistancias(Vector2 alvo);
 Vector2 ProximoPontoNoCaminho(Vector2 posicao);
 bool ChegouAoAlvoDoMapa(Vector2 posicao);
 bool LinhaLivre(Vector2 origem, Vector2 destino);
+void DefinirZonaBloqueada(Rectangle zona);
 
 #endif
