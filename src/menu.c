@@ -41,3 +41,20 @@ void DesenharTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela,
                    (Vector2){0.0f, 0.0f}, 0.0f,
                    (Color){255, 255, 255, (unsigned char)(255.0f * opacidade)});
 }
+
+void DesenharTelaPausa(int larguraTela, int alturaTela){
+    const char *titulo = "PAUSADO";
+    const char *opcoes[] = {"ESC - Continuar", "M - Voltar ao menu", "Q - Sair do jogo"};
+    const int tamanhoTitulo = 48;
+    const int tamanhoOpcao = 22;
+    int y = alturaTela / 2 - 90;
+
+    DrawRectangle(0, 0, larguraTela, alturaTela, (Color){0, 0, 0, 170});
+    DrawText(titulo, (larguraTela - MeasureText(titulo, tamanhoTitulo)) / 2, y, tamanhoTitulo, (Color){214, 204, 190, 255});
+    y += tamanhoTitulo + 28;
+
+    for (int i = 0; i < 3; i++) {
+        DrawText(opcoes[i], (larguraTela - MeasureText(opcoes[i], tamanhoOpcao)) / 2, y, tamanhoOpcao, (Color){150, 112, 72, 255});
+        y += tamanhoOpcao + 12;
+    }
+}

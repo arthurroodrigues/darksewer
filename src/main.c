@@ -49,10 +49,111 @@ static const char *kShaderLanterna =
     "finalColor = vec4(color, alpha);\n"
     "}\n";
 
+typedef enum {
+    ESTADO_MENU,
+    ESTADO_JOGANDO,
+    ESTADO_PAUSADO
+} EstadoJogo;
+
+typedef struct {
+    Vector2 jogador;
+    Vector2 posicoesBateria[QUANTIDADE_BATERIAS];
+    bool bateriasColetadas[QUANTIDADE_BATERIAS];
+    Lanterna lanterna;
+    loot *slotSelecionado;
+    float tempoAnimacaoAndando;
+    bool olhandoEsquerda;
+    bool olhandoParaFrente;
+    bool olhandoVertical;
+    bool quadroAnimacaoAndando;
+} Partida;
+
+static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
+    *partida = (Partida){0};
+    partida->jogador = (Vector2){JOGADOR_INICIAL_X, JOGADOR_INICIAL_Y};
+    partida->lanterna = CriarLanterna();
+    partida->slotSelecionado = primeiroSlot;
+    EsvaziarHotbar(primeiroSlot);
+
+    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
+        if (!EncontrarPosicaoAcessivelAleatoria(
+                partida->jogador, DISTANCIA_MINIMA_SPAWN_BATERIA,
+                partida->posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
+                &partida->posicoesBateria[i])) return false;
+    }
+    return true;
+}
+
+static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, float deltaTempo){
+    if (IsKeyPressed(KEY_E) || GetMouseWheelMove() < 0.0f) partida->slotSelecionado = partida->slotSelecionado->proximo;
+    if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) partida->slotSelecionado = partida->slotSelecionado->anterior;
+
+    if (IsKeyPressed(KEY_F)) AlternarLanterna(&partida->lanterna);
+    if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) &&
+        partida->slotSelecionado->item == ITEM_BATERIA && RecarregarLanterna(&partida->lanterna)) {
+        RemoverItemHotbar(partida->slotSelecionado);
+    }
+    AtualizarLanterna(&partida->lanterna, deltaTempo);
+
+    Vector2 direcaoMovimento = {0.0f, 0.0f};
+
+    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) direcaoMovimento.x -= 1.0f;
+    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) direcaoMovimento.x += 1.0f;
+    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) direcaoMovimento.y -= 1.0f;
+    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) direcaoMovimento.y += 1.0f;
+
+    const bool teclasMovimentoPressionadas = Vector2LengthSqr(direcaoMovimento) > 0.0f;
+    const Vector2 posicaoAnteriorJogador = partida->jogador;
+
+    if (teclasMovimentoPressionadas) {
+        direcaoMovimento = Vector2Normalize(direcaoMovimento);
+        partida->jogador = MoverComColisao(partida->jogador, Vector2Scale(direcaoMovimento, VELOCIDADE_JOGADOR * deltaTempo));
+    }
+
+    const bool jogadorEstaSeMovendo = Vector2DistanceSqr(partida->jogador, posicaoAnteriorJogador) > 0.0001f;
+
+    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
+        if (!partida->bateriasColetadas[i] &&
+            Vector2DistanceSqr(partida->jogador, partida->posicoesBateria[i]) <=
+                RAIO_COLETA_BATERIA * RAIO_COLETA_BATERIA) {
+            partida->bateriasColetadas[i] =
+                AdicionarItemHotbar(primeiroSlot, ITEM_BATERIA);
+            if (partida->bateriasColetadas[i]) TocarSomColeta(sons);
+        }
+    }
+
+    if (jogadorEstaSeMovendo) {
+        const float intensidadeHorizontal = fabsf(direcaoMovimento.x);
+        const float intensidadeVertical = fabsf(direcaoMovimento.y);
+
+        if (intensidadeVertical > intensidadeHorizontal ||
+            (intensidadeVertical == intensidadeHorizontal && partida->olhandoVertical)) {
+            partida->olhandoParaFrente = direcaoMovimento.y > 0.0f;
+            partida->olhandoVertical = true;
+        } else {
+            partida->olhandoEsquerda = direcaoMovimento.x < 0.0f;
+            partida->olhandoVertical = false;
+        }
+
+        partida->tempoAnimacaoAndando += deltaTempo;
+
+        if (partida->tempoAnimacaoAndando >= INTERVALO_ANIMACAO) {
+            partida->tempoAnimacaoAndando -= INTERVALO_ANIMACAO;
+            partida->quadroAnimacaoAndando = !partida->quadroAnimacaoAndando;
+        }
+    } else {
+        partida->tempoAnimacaoAndando = 0.0f;
+        partida->quadroAnimacaoAndando = false;
+    }
+
+    AtualizarPassos(sons, teclasMovimentoPressionadas);
+}
+
 int main(void){
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(LARGURA_JANELA, ALTURA_JANELA, "Dark Sewer");
     SetWindowMinSize(480, 360);
+    SetExitKey(KEY_NULL);
     SetTargetFPS(60);
 
     if (!FileExists(MAPA_ARQUIVO)) {
@@ -99,9 +200,7 @@ int main(void){
         return 1;
     }
 
-    Vector2 jogador = {JOGADOR_INICIAL_X, JOGADOR_INICIAL_Y};
-
-    if (!PodeOcupar(jogador)) {
+    if (!PodeOcupar((Vector2){JOGADOR_INICIAL_X, JOGADOR_INICIAL_Y})) {
         TraceLog(LOG_ERROR, "A posicao inicial do jogador esta bloqueada pela mascara.");
         LiberarMascaraParedes();
         UnloadTexture(telaInicial);
@@ -111,19 +210,6 @@ int main(void){
     }
 
     SetRandomSeed((unsigned int)time(NULL) ^ (unsigned int)(GetTime() * 1000000.0));
-    Vector2 posicoesBateria[QUANTIDADE_BATERIAS] = {0};
-    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-        if (!EncontrarPosicaoAcessivelAleatoria(
-                jogador, DISTANCIA_MINIMA_SPAWN_BATERIA,
-                posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
-                &posicoesBateria[i])) {
-            LiberarMascaraParedes();
-            UnloadTexture(telaInicial);
-            UnloadTexture(mapa);
-            CloseWindow();
-            return 1;
-        }
-    }
 
     if (!FileExists(ARQUIVO_SPRITE_PARADO) || !FileExists(ARQUIVO_SPRITE_ANDANDO) ||
         !FileExists(ARQUIVO_SPRITE_PARADO_ESQUERDA) ||
@@ -213,17 +299,11 @@ int main(void){
     const int localRaioShader = GetShaderLocation(shaderLanterna, "uRadius");
     const int localEscuridaoShader = GetShaderLocation(shaderLanterna, "uDarkness");
 
-    float tempoAnimacaoAndando = 0.0f;
-    bool olhandoEsquerda = false;
-    bool olhandoParaFrente = false;
-    bool olhandoVertical = false;
-    bool quadroAnimacaoAndando = false;
-
     Camera2D camera = {0};
     camera.offset = (Vector2){GetScreenWidth() * 0.5f, GetScreenHeight() * 0.5f};
     camera.zoom = ZOOM_CAMERA;
 
-    bool jogoIniciado = false;
+    EstadoJogo estado = ESTADO_MENU;
     float opacidadeTelaInicial = 0.0f;
 
     loot *primeiroSlot = CriarHotbar();
@@ -246,16 +326,15 @@ int main(void){
         CloseWindow();
         return 1;
     }
-    loot *slotSelecionado = primeiroSlot;
-    bool bateriasColetadas[QUANTIDADE_BATERIAS] = {false};
-    Lanterna lanterna = CriarLanterna();
+    Partida partida = {0};
+    int codigoSaida = 0;
 
     while (!WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
         const int larguraTela = GetScreenWidth();
         const int alturaTela = GetScreenHeight();
 
-        if (!jogoIniciado) {
+        if (estado == ESTADO_MENU) {
             opacidadeTelaInicial = fminf(opacidadeTelaInicial + deltaTempo * 0.5f, 1.0f);
             const Rectangle destinoTelaInicial = CalcularDestinoTelaInicial(telaInicial, larguraTela, alturaTela);
             const Rectangle botaoJogar = CalcularBotaoTelaInicial(telaInicial, destinoTelaInicial);
@@ -264,12 +343,16 @@ int main(void){
 
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
                 (mouseSobreBotao && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
-                jogoIniciado = true;
+                if (!IniciarPartida(&partida, primeiroSlot)) {
+                    codigoSaida = 1;
+                    break;
+                }
+                estado = ESTADO_JOGANDO;
                 if (audioDisponivel) StopMusicStream(sonsJogo.musicaFundo);
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
 
-            if (audioDisponivel && !jogoIniciado) UpdateMusicStream(sonsJogo.musicaFundo);
+            if (audioDisponivel && estado == ESTADO_MENU) UpdateMusicStream(sonsJogo.musicaFundo);
 
             BeginDrawing();
             DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
@@ -277,85 +360,36 @@ int main(void){
             continue;
         }
 
-        if (IsKeyPressed(KEY_E) || GetMouseWheelMove() < 0.0f) slotSelecionado = slotSelecionado->proximo;
-        if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) slotSelecionado = slotSelecionado->anterior;
-
-        if (IsKeyPressed(KEY_F)) AlternarLanterna(&lanterna);
-        if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) &&
-            slotSelecionado->item == ITEM_BATERIA && RecarregarLanterna(&lanterna)) {
-            RemoverItemHotbar(slotSelecionado);
-        }
-        AtualizarLanterna(&lanterna, deltaTempo);
-
-        Vector2 direcaoMovimento = {0.0f, 0.0f};
-
-        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) direcaoMovimento.x -= 1.0f;
-        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) direcaoMovimento.x += 1.0f;
-        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) direcaoMovimento.y -= 1.0f;
-        if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) direcaoMovimento.y += 1.0f;
-        
-        const bool teclasMovimentoPressionadas = Vector2LengthSqr(direcaoMovimento) > 0.0f;
-        const Vector2 posicaoAnteriorJogador = jogador;
-
-        if (teclasMovimentoPressionadas) {
-            direcaoMovimento = Vector2Normalize(direcaoMovimento);
-            jogador = MoverComColisao(jogador, Vector2Scale(direcaoMovimento, VELOCIDADE_JOGADOR * deltaTempo));
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P)) {
+            estado = (estado == ESTADO_JOGANDO) ? ESTADO_PAUSADO : ESTADO_JOGANDO;
         }
 
-        const bool jogadorEstaSeMovendo = Vector2DistanceSqr(jogador, posicaoAnteriorJogador) > 0.0001f;
-
-        for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-            if (!bateriasColetadas[i] &&
-                Vector2DistanceSqr(jogador, posicoesBateria[i]) <=
-                    RAIO_COLETA_BATERIA * RAIO_COLETA_BATERIA) {
-                bateriasColetadas[i] =
-                    AdicionarItemHotbar(primeiroSlot, ITEM_BATERIA);
-                if (bateriasColetadas[i]) TocarSomColeta(&sonsJogo);
-            }
-        }
-
-        if (jogadorEstaSeMovendo) {
-            const float intensidadeHorizontal = fabsf(direcaoMovimento.x);
-            const float intensidadeVertical = fabsf(direcaoMovimento.y);
-
-            if (intensidadeVertical > intensidadeHorizontal ||
-                (intensidadeVertical == intensidadeHorizontal && olhandoVertical)) {
-                olhandoParaFrente = direcaoMovimento.y > 0.0f;
-                olhandoVertical = true;
-            } else {
-                olhandoEsquerda = direcaoMovimento.x < 0.0f;
-                olhandoVertical = false;
-            }
-
-            tempoAnimacaoAndando += deltaTempo;
-
-            if (tempoAnimacaoAndando >= INTERVALO_ANIMACAO) {
-                tempoAnimacaoAndando -= INTERVALO_ANIMACAO;
-                quadroAnimacaoAndando = !quadroAnimacaoAndando;
+        if (estado == ESTADO_PAUSADO) {
+            AtualizarPassos(&sonsJogo, false);
+            if (IsKeyPressed(KEY_Q)) break;
+            if (IsKeyPressed(KEY_M)) {
+                estado = ESTADO_MENU;
+                if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
+                continue;
             }
         } else {
-            tempoAnimacaoAndando = 0.0f;
-            quadroAnimacaoAndando = false;
+            AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
         }
 
         camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
         camera.zoom = ZOOM_CAMERA;
         const float metadeLarguraVisivel = larguraTela / (2.0f * camera.zoom);
         const float metadeAlturaVisivel = alturaTela / (2.0f * camera.zoom);
-        camera.target.x = fmaxf(metadeLarguraVisivel, fminf(jogador.x, MAPA_LARGURA - metadeLarguraVisivel));
-        camera.target.y = fmaxf(metadeAlturaVisivel, fminf(jogador.y, MAPA_ALTURA - metadeAlturaVisivel));
-        
-        if (sonsJogo.dispositivoAudioAtivo) {
-            AtualizarPassos(&sonsJogo, teclasMovimentoPressionadas);
-        }
+        camera.target.x = fmaxf(metadeLarguraVisivel, fminf(partida.jogador.x, MAPA_LARGURA - metadeLarguraVisivel));
+        camera.target.y = fmaxf(metadeAlturaVisivel, fminf(partida.jogador.y, MAPA_ALTURA - metadeAlturaVisivel));
 
-        const Vector2 posicaoJogadorNaTela = GetWorldToScreen2D(jogador, camera);
+        const Vector2 posicaoJogadorNaTela = GetWorldToScreen2D(partida.jogador, camera);
         const Vector2 posicaoLuzShader = {
             posicaoJogadorNaTela.x,
             (float)alturaTela - posicaoJogadorNaTela.y
         };
 
-        const float raioLuzShader = RaioLanterna(&lanterna) * camera.zoom;
+        const float raioLuzShader = RaioLanterna(&partida.lanterna) * camera.zoom;
 
         SetShaderValue(shaderLanterna, localLuzShader, &posicaoLuzShader, SHADER_UNIFORM_VEC2);
         SetShaderValue(shaderLanterna, localRaioShader, &raioLuzShader, SHADER_UNIFORM_FLOAT);
@@ -368,15 +402,15 @@ int main(void){
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-            if (bateriasColetadas[i]) continue;
+            if (partida.bateriasColetadas[i]) continue;
             const float larguraBateria = TAMANHO_BATERIA_MAPA *
                 (float)bateria.width / (float)bateria.height;
             const Rectangle origemBateria = {
                 0.0f, 0.0f, (float)bateria.width, (float)bateria.height
             };
             const Rectangle destinoBateria = {
-                posicoesBateria[i].x - larguraBateria * 0.5f,
-                posicoesBateria[i].y - TAMANHO_BATERIA_MAPA * 0.5f,
+                partida.posicoesBateria[i].x - larguraBateria * 0.5f,
+                partida.posicoesBateria[i].y - TAMANHO_BATERIA_MAPA * 0.5f,
                 larguraBateria,
                 TAMANHO_BATERIA_MAPA
             };
@@ -384,16 +418,14 @@ int main(void){
                            (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         }
 
-        const Texture2D spriteAtual = olhandoVertical
-            ? (olhandoParaFrente
-                ? (quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
-                : (quadroAnimacaoAndando ? spriteTras : spriteParadoTras))
-            : (olhandoEsquerda
-                ? (jogadorEstaSeMovendo && quadroAnimacaoAndando
-                    ? spriteAndandoEsquerda : spriteParadoEsquerda)
-                : (jogadorEstaSeMovendo && quadroAnimacaoAndando
-                    ? spriteAndando : spriteParado));
-        DesenharJogador(jogador, spriteAtual);
+        const Texture2D spriteAtual = partida.olhandoVertical
+            ? (partida.olhandoParaFrente
+                ? (partida.quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
+                : (partida.quadroAnimacaoAndando ? spriteTras : spriteParadoTras))
+            : (partida.olhandoEsquerda
+                ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
+                : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
+        DesenharJogador(partida.jogador, spriteAtual);
 
         EndMode2D();
 
@@ -401,8 +433,9 @@ int main(void){
             DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
         EndShaderMode();
 
-        DesenharHotbar(primeiroSlot, slotSelecionado, bateria);
-        DesenharCargaLanterna(&lanterna, larguraTela);
+        DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
+        DesenharCargaLanterna(&partida.lanterna, larguraTela);
+        if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
 
         EndDrawing();
     }
@@ -424,5 +457,5 @@ int main(void){
     UnloadTexture(mapa);
     CloseWindow();
 
-    return 0;
+    return codigoSaida;
 }
