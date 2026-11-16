@@ -5,11 +5,11 @@
 #include "raymath.h"
 
 #define PAREDES_ARQUIVO "assets/mapa_paredes.png"
-#define MEIA_LARGURA_HITBOX_PES 2.5f
-#define ALTURA_HITBOX_PES 2.0f
-#define DESLOCAMENTO_HITBOX_PES_Y 2.0f
+// caixa de colisao do personagem: cobre das pernas ate a cintura, para o corpo nao entrar nas paredes
+#define MEIA_LARGURA_HITBOX 3.0f
+#define ALTURA_HITBOX 8.0f
+#define DESLOCAMENTO_HITBOX_Y 2.0f
 #define PASSO_GRADE_ACESSIBILIDADE 2.0f
-#define ESPESSURA_MAXIMA_DEGRAU 4
 
 static Color *pixelsMascaraParedes;
 static int larguraMascaraParedes;
@@ -80,42 +80,6 @@ static int CelulaLivreMaisProxima(Vector2 posicao){
     return melhor;
 }
 
-// Na mascara, as linhas dos degraus das escadas saem como parede e fecham a passagem.
-// Parede com poucos pixels de espessura e chao dos dois lados passa a ser chao.
-static bool RemoverParedesFinas(Color *pixels, int largura, int altura){
-    unsigned char *fina = calloc((size_t)largura * (size_t)altura, sizeof(*fina));
-    if (fina == NULL) return false;
-
-    for (int eixo = 0; eixo < 2; eixo++) {
-        const bool vertical = eixo == 0;
-        const int quantidadeFaixas = vertical ? largura : altura;
-        const int comprimento = vertical ? altura : largura;
-        const int passo = vertical ? largura : 1;
-
-        for (int faixa = 0; faixa < quantidadeFaixas; faixa++) {
-            const int base = vertical ? faixa : faixa * largura;
-            int inicioParede = -1;
-
-            for (int i = 0; i < comprimento; i++) {
-                if (pixels[base + i * passo].r < 128) {
-                    if (inicioParede < 0) inicioParede = i;
-                    continue;
-                }
-                if (inicioParede > 0 && i - inicioParede <= ESPESSURA_MAXIMA_DEGRAU) {
-                    for (int j = inicioParede; j < i; j++) fina[base + j * passo] = 1;
-                }
-                inicioParede = -1;
-            }
-        }
-    }
-
-    for (int i = 0; i < largura * altura; i++) {
-        if (fina[i]) pixels[i] = WHITE;
-    }
-    free(fina);
-    return true;
-}
-
 bool CarregarMascaraParedes(void){
     Image imagem = LoadImage(PAREDES_ARQUIVO);
 
@@ -149,12 +113,6 @@ bool CarregarMascaraParedes(void){
         }
     }
 
-    if (!RemoverParedesFinas(pixels, larguraMascara, alturaMascara)) {
-        TraceLog(LOG_ERROR, "Falha ao alocar memoria para tratar a mascara de paredes.");
-        UnloadImageColors(pixels);
-        return false;
-    }
-
     pixelsMascaraParedes = pixels;
     larguraMascaraParedes = larguraMascara;
     alturaMascaraParedes = alturaMascara;
@@ -182,11 +140,11 @@ static bool PixelParede(int x, int y){
 }
 
 bool PodeOcupar(Vector2 posicaoJogador){
-    const float esquerda = posicaoJogador.x - MEIA_LARGURA_HITBOX_PES;
-    const float direita = posicaoJogador.x + MEIA_LARGURA_HITBOX_PES;
+    const float esquerda = posicaoJogador.x - MEIA_LARGURA_HITBOX;
+    const float direita = posicaoJogador.x + MEIA_LARGURA_HITBOX;
     const float topo =
-        posicaoJogador.y - DESLOCAMENTO_HITBOX_PES_Y - ALTURA_HITBOX_PES;
-    const float base = posicaoJogador.y - DESLOCAMENTO_HITBOX_PES_Y;
+        posicaoJogador.y - DESLOCAMENTO_HITBOX_Y - ALTURA_HITBOX;
+    const float base = posicaoJogador.y - DESLOCAMENTO_HITBOX_Y;
 
     if (esquerda < 0.0f || topo < 0.0f ||
         direita > MAPA_LARGURA || base > MAPA_ALTURA) return false;
@@ -411,13 +369,13 @@ bool ChegouAoAlvoDoMapa(Vector2 posicao){
 bool LinhaLivre(Vector2 origem, Vector2 destino){
     const float escalaMascaraX = (float)larguraMascaraParedes / (float)MAPA_LARGURA;
     const float escalaMascaraY = (float)alturaMascaraParedes / (float)MAPA_ALTURA;
-    const float alturaPes = DESLOCAMENTO_HITBOX_PES_Y + ALTURA_HITBOX_PES * 0.5f;
+    const float alturaCorpo = DESLOCAMENTO_HITBOX_Y + ALTURA_HITBOX * 0.5f;
     const int amostras = (int)ceilf(Vector2Distance(origem, destino) * 2.0f) + 1;
 
     for (int i = 0; i <= amostras; i++) {
         const Vector2 ponto = Vector2Lerp(origem, destino, (float)i / (float)amostras);
         if (PixelParede((int)(ponto.x * escalaMascaraX),
-                        (int)((ponto.y - alturaPes) * escalaMascaraY))) return false;
+                        (int)((ponto.y - alturaCorpo) * escalaMascaraY))) return false;
     }
     return true;
 }
