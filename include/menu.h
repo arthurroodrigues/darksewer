@@ -7,5 +7,6 @@ Rectangle CalcularDestinoTelaInicial(Texture2D imagemFundo, int larguraTela, int
 Rectangle CalcularBotaoTelaInicial(Texture2D imagemFundo, Rectangle destinoImagemFundo);
 void DesenharTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela, float opacidade);
 void DesenharTelaPausa(int larguraTela, int alturaTela);
+void DesenharTelaFim(int larguraTela, int alturaTela);
 
 #endif

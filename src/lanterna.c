@@ -35,6 +35,10 @@ float RaioLanterna(const Lanterna *lanterna){
     return RAIO_LANTERNA_MINIMO + (RAIO_LANTERNA_MAXIMO - RAIO_LANTERNA_MINIMO) * intensidade;
 }
 
+bool LanternaAcesa(const Lanterna *lanterna){
+    return lanterna->ligada && lanterna->carga > 0.0f;
+}
+
 void DesenharCargaLanterna(const Lanterna *lanterna, int larguraTela){
     const int largura = 120;
     const int altura = 14;

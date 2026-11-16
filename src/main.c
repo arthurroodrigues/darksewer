@@ -5,6 +5,7 @@
 #include "menu.h"
 #include "jogador.h"
 #include "lanterna.h"
+#include "inimigo.h"
 #include "raymath.h"
 #include <math.h>
 #include <time.h>
@@ -52,7 +53,8 @@ static const char *kShaderLanterna =
 typedef enum {
     ESTADO_MENU,
     ESTADO_JOGANDO,
-    ESTADO_PAUSADO
+    ESTADO_PAUSADO,
+    ESTADO_FIM
 } EstadoJogo;
 
 typedef struct {
@@ -60,6 +62,7 @@ typedef struct {
     Vector2 posicoesBateria[QUANTIDADE_BATERIAS];
     bool bateriasColetadas[QUANTIDADE_BATERIAS];
     Lanterna lanterna;
+    Inimigo inimigo;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
     bool olhandoEsquerda;
@@ -81,7 +84,7 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
                 partida->posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
                 &partida->posicoesBateria[i])) return false;
     }
-    return true;
+    return PosicionarInimigo(&partida->inimigo, partida->jogador);
 }
 
 static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, float deltaTempo){
@@ -146,6 +149,8 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
         partida->quadroAnimacaoAndando = false;
     }
 
+    AtualizarInimigo(&partida->inimigo, partida->jogador,
+                     LanternaAcesa(&partida->lanterna), deltaTempo);
     AtualizarPassos(sons, teclasMovimentoPressionadas);
 }
 
@@ -327,9 +332,9 @@ int main(void){
         return 1;
     }
     Partida partida = {0};
-    int codigoSaida = 0;
+    int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
 
-    while (!WindowShouldClose()) {
+    while (codigoSaida == 0 && !WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
         const int larguraTela = GetScreenWidth();
         const int alturaTela = GetScreenHeight();
@@ -360,20 +365,25 @@ int main(void){
             continue;
         }
 
-        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P)) {
+        if (estado != ESTADO_FIM && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))) {
             estado = (estado == ESTADO_JOGANDO) ? ESTADO_PAUSADO : ESTADO_JOGANDO;
         }
 
-        if (estado == ESTADO_PAUSADO) {
+        if (estado == ESTADO_JOGANDO) {
+            AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
+            if (InimigoPegouJogador(&partida.inimigo, partida.jogador)) estado = ESTADO_FIM;
+        } else {
             AtualizarPassos(&sonsJogo, false);
-            if (IsKeyPressed(KEY_Q)) break;
-            if (IsKeyPressed(KEY_M)) {
+            if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
+            if ((estado == ESTADO_PAUSADO && IsKeyPressed(KEY_M)) ||
+                (estado == ESTADO_FIM && IsKeyPressed(KEY_ENTER))) {
                 estado = ESTADO_MENU;
                 if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
+                BeginDrawing();
+                DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
+                EndDrawing();
                 continue;
             }
-        } else {
-            AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
         }
 
         camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
@@ -418,6 +428,10 @@ int main(void){
                            (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         }
 
+        // quem esta mais abaixo na tela fica na frente
+        const bool inimigoAtras = partida.inimigo.posicao.y <= partida.jogador.y;
+        if (inimigoAtras) DesenharInimigo(&partida.inimigo);
+
         const Texture2D spriteAtual = partida.olhandoVertical
             ? (partida.olhandoParaFrente
                 ? (partida.quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
@@ -426,6 +440,7 @@ int main(void){
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
         DesenharJogador(partida.jogador, spriteAtual);
+        if (!inimigoAtras) DesenharInimigo(&partida.inimigo);
 
         EndMode2D();
 
@@ -436,10 +451,12 @@ int main(void){
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
         if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
+        if (estado == ESTADO_FIM) DesenharTelaFim(larguraTela, alturaTela);
 
         EndDrawing();
     }
 
+    LiberarSpritesInimigo();
     LiberarHotbar(primeiroSlot);
     UnloadShader(shaderLanterna);
     LiberarSons(&sonsJogo);
