@@ -18,21 +18,18 @@
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 7.5f
 #define INTENSIDADE_ESCURO 0.99f
-#define TAMANHO_BATERIA_MAPA 15.0f
-#define RAIO_COLETA_BATERIA 12.5f
-#define DISTANCIA_MINIMA_SPAWN_BATERIA 24.0f
-#define DISTANCIA_MINIMA_ENTRE_BATERIAS 32.0f
-#define QUANTIDADE_BATERIAS 3
+#define TAMANHO_ITEM_MAPA 13.0f
+#define RAIO_COLETA_ITEM 12.5f
 #define QUANTIDADE_CHAVES 3
-#define TAMANHO_CHAVE_MAPA 12.0f
-#define RAIO_COLETA_CHAVE 12.5f
-#define DISTANCIA_MINIMA_SPAWN_CHAVE 150.0f
-#define DISTANCIA_MINIMA_ENTRE_CHAVES 150.0f
+#define QUANTIDADE_BATERIAS 3
+#define QUANTIDADE_ISCAS 2
+#define QUANTIDADE_BUSSOLAS 1
+#define QUANTIDADE_ITENS_MAPA \
+    (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS + QUANTIDADE_ISCAS + QUANTIDADE_BUSSOLAS)
+#define DURACAO_ISCA 8.0f
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 9.0f
 #define VELOCIDADE_JOGADOR 112.0f
-#define VIDAS_INICIAIS 3
-#define TEMPO_INVULNERAVEL 2.0f
 #define JOGADOR_INICIAL_X 100.0f
 #define JOGADOR_INICIAL_Y 600.0f
 #define ARQUIVO_SPRITE_PARADO "assets\\jogador_parado.png"
@@ -51,6 +48,25 @@
 static const Rectangle kZonaPorta = {478.0f, 502.0f, 28.0f, 8.0f};
 static const Vector2 kCentroPorta = {492.0f, 506.0f};
 static const Vector2 kBueiro = {491.0f, 585.0f};
+
+typedef struct {
+    Vector2 posicao;
+    ItemHotbar item;
+    bool coletado;
+} ItemNoMapa;
+
+// o que nasce no mapa a cada partida: quantos, a que distancia do jogador e entre si
+static const struct {
+    ItemHotbar item;
+    int quantidade;
+    float distanciaDoJogador;
+    float distanciaEntreItens;
+} kItensSorteados[] = {
+    {ITEM_CHAVE, QUANTIDADE_CHAVES, 150.0f, 150.0f},
+    {ITEM_BATERIA, QUANTIDADE_BATERIAS, 24.0f, 32.0f},
+    {ITEM_ISCA, QUANTIDADE_ISCAS, 60.0f, 32.0f},
+    {ITEM_BUSSOLA, QUANTIDADE_BUSSOLAS, 60.0f, 32.0f},
+};
 
 static const char *kShaderLanterna =
     "#version 330\n"
@@ -78,16 +94,14 @@ typedef enum {
 
 typedef struct {
     Vector2 jogador;
-    Vector2 posicoesBateria[QUANTIDADE_BATERIAS];
-    bool bateriasColetadas[QUANTIDADE_BATERIAS];
-    Vector2 posicoesChave[QUANTIDADE_CHAVES];
-    bool chavesColetadas[QUANTIDADE_CHAVES];
+    ItemNoMapa itens[QUANTIDADE_ITENS_MAPA];
     bool portaAberta;
     bool escapou;
     Lanterna lanterna;
     Inimigo inimigo;
-    int vidas;
-    float tempoInvulneravel;
+    bool pego;
+    Vector2 posicaoIsca;
+    float tempoIsca;
     float tempoPartida;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
@@ -97,26 +111,44 @@ typedef struct {
     bool quadroAnimacaoAndando;
 } Partida;
 
+// Para onde a bussola aponta: a chave mais proxima ainda no mapa;
+// sem chaves para pegar, a porta; com a porta aberta, o bueiro.
+static Vector2 AlvoDaBussola(const Partida *partida){
+    Vector2 alvo = partida->portaAberta ? kBueiro : kCentroPorta;
+    float menorDistancia = -1.0f;
+
+    for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+        const ItemNoMapa *item = &partida->itens[i];
+        if (item->item != ITEM_CHAVE || item->coletado) continue;
+
+        const float distancia = Vector2DistanceSqr(partida->jogador, item->posicao);
+        if (menorDistancia < 0.0f || distancia < menorDistancia) {
+            menorDistancia = distancia;
+            alvo = item->posicao;
+        }
+    }
+    return alvo;
+}
+
 static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
     *partida = (Partida){0};
     partida->jogador = (Vector2){JOGADOR_INICIAL_X, JOGADOR_INICIAL_Y};
     partida->lanterna = CriarLanterna();
-    partida->vidas = VIDAS_INICIAIS;
     partida->slotSelecionado = primeiroSlot;
     EsvaziarHotbar(primeiroSlot);
     DefinirZonaBloqueada(kZonaPorta);
 
-    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-        if (!EncontrarPosicaoAcessivelAleatoria(
-                partida->jogador, DISTANCIA_MINIMA_SPAWN_BATERIA,
-                partida->posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
-                &partida->posicoesBateria[i])) return false;
-    }
-    for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
-        if (!EncontrarPosicaoAcessivelAleatoria(
-                partida->jogador, DISTANCIA_MINIMA_SPAWN_CHAVE,
-                partida->posicoesChave, i, DISTANCIA_MINIMA_ENTRE_CHAVES,
-                &partida->posicoesChave[i])) return false;
+    Vector2 posicoesOcupadas[QUANTIDADE_ITENS_MAPA];
+    int total = 0;
+    for (size_t tipo = 0; tipo < sizeof(kItensSorteados) / sizeof(kItensSorteados[0]); tipo++) {
+        for (int i = 0; i < kItensSorteados[tipo].quantidade && total < QUANTIDADE_ITENS_MAPA; i++) {
+            if (!EncontrarPosicaoAcessivelAleatoria(
+                    partida->jogador, kItensSorteados[tipo].distanciaDoJogador,
+                    posicoesOcupadas, total, kItensSorteados[tipo].distanciaEntreItens,
+                    &posicoesOcupadas[total])) return false;
+            partida->itens[total] = (ItemNoMapa){posicoesOcupadas[total], kItensSorteados[tipo].item, false};
+            total++;
+        }
     }
     return PosicionarInimigo(&partida->inimigo, partida->jogador);
 }
@@ -128,10 +160,19 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) partida->slotSelecionado = partida->slotSelecionado->anterior;
 
     if (IsKeyPressed(KEY_F)) AlternarLanterna(&partida->lanterna);
-    if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) &&
-        partida->slotSelecionado->item == ITEM_BATERIA && RecarregarLanterna(&partida->lanterna)) {
-        RemoverItemHotbar(partida->slotSelecionado);
+    if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        loot *slot = partida->slotSelecionado;
+        if (slot->item == ITEM_BATERIA && RecarregarLanterna(&partida->lanterna)) {
+            RemoverItemHotbar(slot);
+        } else if (slot->item == ITEM_ISCA) {
+            // larga a isca no chao: o inimigo esquece o jogador e vai ate ela
+            RemoverItemHotbar(slot);
+            partida->posicaoIsca = partida->jogador;
+            partida->tempoIsca = DURACAO_ISCA;
+            AtrairInimigo(&partida->inimigo, partida->posicaoIsca, DURACAO_ISCA);
+        }
     }
+    partida->tempoIsca = fmaxf(partida->tempoIsca - deltaTempo, 0.0f);
     AtualizarLanterna(&partida->lanterna, deltaTempo);
 
     Vector2 direcaoMovimento = {0.0f, 0.0f};
@@ -151,22 +192,12 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 
     const bool jogadorEstaSeMovendo = Vector2DistanceSqr(partida->jogador, posicaoAnteriorJogador) > 0.0001f;
 
-    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-        if (!partida->bateriasColetadas[i] &&
-            Vector2DistanceSqr(partida->jogador, partida->posicoesBateria[i]) <=
-                RAIO_COLETA_BATERIA * RAIO_COLETA_BATERIA) {
-            partida->bateriasColetadas[i] =
-                AdicionarItemHotbar(primeiroSlot, ITEM_BATERIA);
-            if (partida->bateriasColetadas[i]) TocarSomColeta(sons);
-        }
-    }
-
-    for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
-        if (!partida->chavesColetadas[i] &&
-            Vector2DistanceSqr(partida->jogador, partida->posicoesChave[i]) <=
-                RAIO_COLETA_CHAVE * RAIO_COLETA_CHAVE) {
-            partida->chavesColetadas[i] = AdicionarItemHotbar(primeiroSlot, ITEM_CHAVE);
-            if (partida->chavesColetadas[i]) TocarSomColeta(sons);
+    for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+        ItemNoMapa *item = &partida->itens[i];
+        if (!item->coletado &&
+            Vector2DistanceSqr(partida->jogador, item->posicao) <= RAIO_COLETA_ITEM * RAIO_COLETA_ITEM) {
+            item->coletado = AdicionarItemHotbar(primeiroSlot, item->item);
+            if (item->coletado) TocarSomColeta(sons);
         }
     }
 
@@ -211,13 +242,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     AtualizarInimigo(&partida->inimigo, partida->jogador,
                      LanternaAcesa(&partida->lanterna), deltaTempo);
 
-    partida->tempoInvulneravel = fmaxf(partida->tempoInvulneravel - deltaTempo, 0.0f);
-    if (partida->tempoInvulneravel <= 0.0f &&
-        InimigoPegouJogador(&partida->inimigo, partida->jogador)) {
-        partida->vidas--;
-        if (partida->vidas > 0) partida->tempoInvulneravel = TEMPO_INVULNERAVEL;
-        AfastarInimigo(&partida->inimigo);
-    }
+    if (InimigoPegouJogador(&partida->inimigo, partida->jogador)) partida->pego = true;
 
     AtualizarPassos(sons, teclasMovimentoPressionadas);
 }
@@ -475,7 +500,7 @@ int main(void){
 
         if (estado == ESTADO_JOGANDO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
-            if (partida.vidas <= 0) estado = ESTADO_FIM;
+            if (partida.pego) estado = ESTADO_FIM;
             else if (partida.escapou) {
                 estado = ESTADO_VITORIA;
                 nomeJogador[0] = '\0';
@@ -560,25 +585,14 @@ int main(void){
         const Rectangle origemMapa = {0.0f, 0.0f, (float)mapa.width, (float)mapa.height};
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
-        for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-            if (partida.bateriasColetadas[i]) continue;
-            const float larguraBateria = TAMANHO_BATERIA_MAPA *
-                (float)bateria.width / (float)bateria.height;
-            const Rectangle origemBateria = {
-                0.0f, 0.0f, (float)bateria.width, (float)bateria.height
-            };
-            const Rectangle destinoBateria = {
-                partida.posicoesBateria[i].x - larguraBateria * 0.5f,
-                partida.posicoesBateria[i].y - TAMANHO_BATERIA_MAPA * 0.5f,
-                larguraBateria,
-                TAMANHO_BATERIA_MAPA
-            };
-            DrawTexturePro(bateria, origemBateria, destinoBateria,
-                           (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+        for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+            const ItemNoMapa *item = &partida.itens[i];
+            if (!item->coletado) DesenharItem(item->item, item->posicao, TAMANHO_ITEM_MAPA, bateria);
         }
 
-        for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
-            if (!partida.chavesColetadas[i]) DesenharChave(partida.posicoesChave[i], TAMANHO_CHAVE_MAPA);
+        // a isca largada pisca no chao enquanto atrai o inimigo
+        if (partida.tempoIsca > 0.0f && fmodf(partida.tempoIsca, 0.4f) < 0.25f) {
+            DesenharItem(ITEM_ISCA, partida.posicaoIsca, TAMANHO_ITEM_MAPA, bateria);
         }
 
         if (!partida.portaAberta) {
@@ -600,10 +614,7 @@ int main(void){
             : (partida.olhandoEsquerda
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
-        // pisca enquanto esta invulneravel depois de um golpe
-        const bool jogadorOculto = estado == ESTADO_JOGANDO &&
-            fmodf(partida.tempoInvulneravel, 0.2f) >= 0.1f;
-        if (!jogadorOculto) DesenharJogador(partida.jogador, spriteAtual);
+        DesenharJogador(partida.jogador, spriteAtual);
         if (!inimigoAtras) DesenharInimigo(&partida.inimigo);
 
         EndMode2D();
@@ -612,9 +623,21 @@ int main(void){
             DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
         EndShaderMode();
 
+        if (estado == ESTADO_JOGANDO && partida.slotSelecionado->item == ITEM_BUSSOLA) {
+            // seta em volta do jogador, apontando para o alvo da bussola
+            const Vector2 centro = GetWorldToScreen2D(
+                (Vector2){partida.jogador.x, partida.jogador.y - 12.0f}, camera);
+            const Vector2 alvo = GetWorldToScreen2D(AlvoDaBussola(&partida), camera);
+            const Vector2 direcao = Vector2Normalize(Vector2Subtract(alvo, centro));
+            const Vector2 lateral = {-direcao.y, direcao.x};
+            const Vector2 base = Vector2Add(centro, Vector2Scale(direcao, 78.0f));
+            DrawTriangle(Vector2Add(centro, Vector2Scale(direcao, 104.0f)),
+                         Vector2Subtract(base, Vector2Scale(lateral, 11.0f)),
+                         Vector2Add(base, Vector2Scale(lateral, 11.0f)), (Color){212, 175, 55, 255});
+        }
+
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
-        DesenharVidas(partida.vidas, VIDAS_INICIAIS, larguraTela);
 
         const char *relogio = FormatarTempo(partida.tempoPartida);
         DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});

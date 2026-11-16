@@ -126,26 +126,9 @@ void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria){
         const bool ativo = (no == selecionado);
 
         DrawRectangle(x, y, tamanho, tamanho, (Color){10, 16, 15, 200});
-        if (no->item == ITEM_CHAVE) {
-            DesenharChave((Vector2){(float)x + (float)tamanho * 0.5f, (float)y + (float)tamanho * 0.5f},
-                          (float)tamanho * 0.6f);
-        }
-        if (no->item == ITEM_BATERIA && bateria.id != 0) {
-            const float areaDisponivel = (float)tamanho - 8.0f;
-            const float escalaLargura = areaDisponivel / (float)bateria.width;
-            const float escalaAltura = areaDisponivel / (float)bateria.height;
-            const float escala = escalaLargura < escalaAltura ? escalaLargura : escalaAltura;
-            const float largura = (float)bateria.width * escala;
-            const float altura = (float)bateria.height * escala;
-            const Rectangle origem = {0.0f, 0.0f, (float)bateria.width, (float)bateria.height};
-            const Rectangle destino = {
-                (float)x + ((float)tamanho - largura) * 0.5f,
-                (float)y + ((float)tamanho - altura) * 0.5f,
-                largura,
-                altura
-            };
-            DrawTexturePro(bateria, origem, destino, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
-        }
+        DesenharItem(no->item,
+                     (Vector2){(float)x + (float)tamanho * 0.5f, (float)y + (float)tamanho * 0.5f},
+                     (float)tamanho - 16.0f, bateria);
         if (no->quantidade > 1) {
             const char *quantidade = TextFormat("%d", no->quantidade);
             const int tamanhoTexto = MeasureText(quantidade, 14);
@@ -158,7 +141,7 @@ void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria){
 }
 
 // Chave desenhada com formas: argola a esquerda, haste e dois dentes.
-void DesenharChave(Vector2 centro, float tamanho){
+static void DesenharChave(Vector2 centro, float tamanho){
     const Color cor = {212, 175, 55, 255};
     const float raio = tamanho * 0.22f;
     const float espessura = tamanho * 0.12f;
@@ -169,4 +152,53 @@ void DesenharChave(Vector2 centro, float tamanho){
                                  tamanho * 0.56f, espessura}, cor);
     DrawRectangleRec((Rectangle){centro.x + tamanho * 0.22f, centro.y, espessura, tamanho * 0.2f}, cor);
     DrawRectangleRec((Rectangle){centro.x + tamanho * 0.38f, centro.y, espessura, tamanho * 0.16f}, cor);
+}
+
+// Isca desenhada com formas: um despertador vermelho com duas campainhas.
+static void DesenharIsca(Vector2 centro, float tamanho){
+    const Color vermelho = {190, 50, 40, 255};
+    const Color mostrador = {230, 220, 200, 255};
+    const float raio = tamanho * 0.34f;
+
+    DrawCircleV((Vector2){centro.x - raio * 0.8f, centro.y - raio * 0.9f}, raio * 0.42f, vermelho);
+    DrawCircleV((Vector2){centro.x + raio * 0.8f, centro.y - raio * 0.9f}, raio * 0.42f, vermelho);
+    DrawCircleV(centro, raio, vermelho);
+    DrawCircleV(centro, raio * 0.66f, mostrador);
+    DrawRectangleRec((Rectangle){centro.x - raio * 0.07f, centro.y - raio * 0.5f,
+                                 raio * 0.14f, raio * 0.55f}, vermelho);
+    DrawRectangleRec((Rectangle){centro.x, centro.y - raio * 0.07f, raio * 0.4f, raio * 0.14f}, vermelho);
+}
+
+// Bussola desenhada com formas: aro dourado e agulha de duas cores.
+static void DesenharBussola(Vector2 centro, float tamanho){
+    const float raio = tamanho * 0.42f;
+    const float meiaLargura = raio * 0.22f;
+
+    DrawCircleV(centro, raio, (Color){212, 175, 55, 255});
+    DrawCircleV(centro, raio * 0.8f, (Color){24, 28, 30, 255});
+    DrawTriangle((Vector2){centro.x, centro.y - raio * 0.7f},
+                 (Vector2){centro.x - meiaLargura, centro.y},
+                 (Vector2){centro.x + meiaLargura, centro.y}, (Color){190, 50, 40, 255});
+    DrawTriangle((Vector2){centro.x, centro.y + raio * 0.7f},
+                 (Vector2){centro.x + meiaLargura, centro.y},
+                 (Vector2){centro.x - meiaLargura, centro.y}, (Color){230, 220, 200, 255});
+}
+
+// Desenha um item centrado em um ponto, cabendo em um quadrado de lado `tamanho`.
+void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bateria){
+    if (item == ITEM_BATERIA && bateria.id != 0) {
+        const int maiorLado = bateria.width > bateria.height ? bateria.width : bateria.height;
+        const float escala = tamanho / (float)maiorLado;
+        const float largura = (float)bateria.width * escala;
+        const float altura = (float)bateria.height * escala;
+        const Rectangle origem = {0.0f, 0.0f, (float)bateria.width, (float)bateria.height};
+        const Rectangle destino = {centro.x - largura * 0.5f, centro.y - altura * 0.5f, largura, altura};
+        DrawTexturePro(bateria, origem, destino, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+    } else if (item == ITEM_CHAVE) {
+        DesenharChave(centro, tamanho);
+    } else if (item == ITEM_ISCA) {
+        DesenharIsca(centro, tamanho);
+    } else if (item == ITEM_BUSSOLA) {
+        DesenharBussola(centro, tamanho);
+    }
 }
