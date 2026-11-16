@@ -49,13 +49,13 @@ jobs:
       - name: Instalar dependencias
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
-          # sem atualizar a base de pacotes, o pacman nao encontra a raylib
+          # o MSYS2 so publica a raylib para o ambiente UCRT64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-raylib
-            mingw-w64-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-raylib
+            mingw-w64-ucrt-x86_64-pkgconf
             make
 
       - name: Compilar o jogo

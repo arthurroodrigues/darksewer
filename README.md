@@ -45,10 +45,11 @@ O jogo precisa de um compilador C, do `make`, do `pkg-config` e da **raylib 5.5 
 
 ### Windows (MSYS2)
 
-No terminal **MSYS2 MinGW64**:
+No terminal **MSYS2 UCRT64** (o MSYS2 só publica a raylib para esse ambiente):
 
 ```bash
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-raylib mingw-w64-x86_64-pkgconf make
+pacman -Syu
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-raylib mingw-w64-ucrt-x86_64-pkgconf make
 make
 ./jogo.exe
 ```
