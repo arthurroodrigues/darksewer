@@ -1,0 +1,60 @@
+name: build
+
+# Compila o jogo nos tres sistemas. Nao roda o jogo: ele precisa de tela.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
+
+      - name: Compilar a raylib 5.5
+        run: |
+          git clone --depth 1 --branch 5.5 https://github.com/raysan5/raylib.git "$RUNNER_TEMP/raylib"
+          cmake -S "$RUNNER_TEMP/raylib" -B "$RUNNER_TEMP/raylib/build" -DBUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/raylib/build" --parallel
+          sudo cmake --install "$RUNNER_TEMP/raylib/build"
+
+      - name: Compilar o jogo
+        run: make
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: brew install raylib pkg-config
+
+      - name: Compilar o jogo
+        run: make
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-raylib
+            mingw-w64-x86_64-pkgconf
+            make
+
+      - name: Compilar o jogo
+        run: make
