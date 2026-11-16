@@ -20,12 +20,12 @@
 
 // ordem: de lado, de frente e de costas; em cada par, parado e andando
 static const char *const kArquivosSprites[QUANTIDADE_SPRITES_INIMIGO] = {
-    "assets\\inimigo_parado.png",
-    "assets\\inimigo_andando.png",
-    "assets\\inimigo_parado_para_frente.png",
-    "assets\\inimigo_andando_para_frente.png",
-    "assets\\inimigo_parado_para_tras.png",
-    "assets\\inimigo_andando_para_tras.png"
+    "assets/inimigo_parado.png",
+    "assets/inimigo_andando.png",
+    "assets/inimigo_parado_para_frente.png",
+    "assets/inimigo_andando_para_frente.png",
+    "assets/inimigo_parado_para_tras.png",
+    "assets/inimigo_andando_para_tras.png"
 };
 static Texture2D sprites[QUANTIDADE_SPRITES_INIMIGO];
 

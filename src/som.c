@@ -27,8 +27,8 @@ bool InicializarSons(Sons *estadoSons){
     char caminhoPassos[512];
     char caminhoColeta[512];
 
-    if (!ResolverArquivoAudio("sons\\musica_fundo.mp3", caminhoMusica,sizeof(caminhoMusica)) ||
-        !ResolverArquivoAudio("sons\\passos.mp3", caminhoPassos, sizeof(caminhoPassos))) {
+    if (!ResolverArquivoAudio("sons/musica_fundo.mp3", caminhoMusica,sizeof(caminhoMusica)) ||
+        !ResolverArquivoAudio("sons/passos.mp3", caminhoPassos, sizeof(caminhoPassos))) {
         TraceLog(LOG_WARNING, "Audio incompleto; a gameplay continuara sem audio.");
         return false;
     }
@@ -50,7 +50,7 @@ bool InicializarSons(Sons *estadoSons){
         return false;
     }
 
-    if (ResolverArquivoAudio("sons\\coleta.wav", caminhoColeta,
+    if (ResolverArquivoAudio("sons/coleta.wav", caminhoColeta,
                              sizeof(caminhoColeta))) {
         estadoSons->somColeta = LoadSound(caminhoColeta);
         if (!IsSoundValid(estadoSons->somColeta)) {
