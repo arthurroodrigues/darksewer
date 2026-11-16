@@ -3,7 +3,6 @@
 
 typedef enum {
     DESENHO_ITEM,
-    DESENHO_ISCA,
     DESENHO_INIMIGO,
     DESENHO_JOGADOR
 } TipoDesenho;

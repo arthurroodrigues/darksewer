@@ -7,7 +7,6 @@ typedef enum {
     ITEM_NENHUM,
     ITEM_BATERIA,
     ITEM_CHAVE,
-    ITEM_ISCA,
     ITEM_BUSSOLA
 } ItemHotbar;
 
