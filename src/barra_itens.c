@@ -154,6 +154,21 @@ static void DesenharChave(Vector2 centro, float tamanho){
     DrawRectangleRec((Rectangle){centro.x + tamanho * 0.38f, centro.y, espessura, tamanho * 0.16f}, cor);
 }
 
+// Isca desenhada com formas: um despertador vermelho com duas campainhas.
+static void DesenharIsca(Vector2 centro, float tamanho){
+    const Color vermelho = {190, 50, 40, 255};
+    const Color mostrador = {230, 220, 200, 255};
+    const float raio = tamanho * 0.34f;
+
+    DrawCircleV((Vector2){centro.x - raio * 0.8f, centro.y - raio * 0.9f}, raio * 0.42f, vermelho);
+    DrawCircleV((Vector2){centro.x + raio * 0.8f, centro.y - raio * 0.9f}, raio * 0.42f, vermelho);
+    DrawCircleV(centro, raio, vermelho);
+    DrawCircleV(centro, raio * 0.66f, mostrador);
+    DrawRectangleRec((Rectangle){centro.x - raio * 0.07f, centro.y - raio * 0.5f,
+                                 raio * 0.14f, raio * 0.55f}, vermelho);
+    DrawRectangleRec((Rectangle){centro.x, centro.y - raio * 0.07f, raio * 0.4f, raio * 0.14f}, vermelho);
+}
+
 // Desenha um item centrado em um ponto, cabendo em um quadrado de lado `tamanho`.
 void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bateria){
     if (item == ITEM_BATERIA && bateria.id != 0) {
@@ -166,5 +181,7 @@ void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bate
         DrawTexturePro(bateria, origem, destino, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
     } else if (item == ITEM_CHAVE) {
         DesenharChave(centro, tamanho);
+    } else if (item == ITEM_ISCA) {
+        DesenharIsca(centro, tamanho);
     }
 }

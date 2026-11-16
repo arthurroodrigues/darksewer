@@ -116,6 +116,15 @@ bool PosicionarInimigo(Inimigo *inimigo, Vector2 posicaoJogador){
 }
 
 void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa, float deltaTempo){
+    if (inimigo->estado == INIMIGO_DISTRAIDO) {
+        inimigo->tempoDistraido -= deltaTempo;
+        if (inimigo->tempoDistraido > 0.0f) {
+            Andar(inimigo, VELOCIDADE_PERSEGUICAO * deltaTempo, deltaTempo);
+            return;
+        }
+        EscolherAlvoPatrulha(inimigo);
+    }
+
     const float alcance = lanternaAcesa ? ALCANCE_VISAO_LANTERNA_ACESA : ALCANCE_VISAO_ESCURO;
     const bool vendoJogador =
         Vector2DistanceSqr(inimigo->posicao, posicaoJogador) <= alcance * alcance &&
@@ -144,6 +153,14 @@ void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAce
     const float velocidade = inimigo->estado == INIMIGO_PATRULHANDO
         ? VELOCIDADE_PATRULHA : VELOCIDADE_PERSEGUICAO;
     Andar(inimigo, velocidade * deltaTempo, deltaTempo);
+}
+
+// Faz o inimigo ignorar o jogador por um tempo e ir ate um ponto (isca).
+void AtrairInimigo(Inimigo *inimigo, Vector2 ponto, float duracao){
+    if (!AtualizarMapaDistancias(ponto)) return;
+
+    inimigo->estado = INIMIGO_DISTRAIDO;
+    inimigo->tempoDistraido = duracao;
 }
 
 bool InimigoPegouJogador(const Inimigo *inimigo, Vector2 posicaoJogador){

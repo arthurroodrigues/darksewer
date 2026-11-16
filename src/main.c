@@ -22,7 +22,9 @@
 #define RAIO_COLETA_ITEM 12.5f
 #define QUANTIDADE_CHAVES 3
 #define QUANTIDADE_BATERIAS 3
-#define QUANTIDADE_ITENS_MAPA (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS)
+#define QUANTIDADE_ISCAS 2
+#define QUANTIDADE_ITENS_MAPA (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS + QUANTIDADE_ISCAS)
+#define DURACAO_ISCA 8.0f
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 9.0f
 #define VELOCIDADE_JOGADOR 112.0f
@@ -60,6 +62,7 @@ static const struct {
 } kItensSorteados[] = {
     {ITEM_CHAVE, QUANTIDADE_CHAVES, 150.0f, 150.0f},
     {ITEM_BATERIA, QUANTIDADE_BATERIAS, 24.0f, 32.0f},
+    {ITEM_ISCA, QUANTIDADE_ISCAS, 60.0f, 32.0f},
 };
 
 static const char *kShaderLanterna =
@@ -94,6 +97,8 @@ typedef struct {
     Lanterna lanterna;
     Inimigo inimigo;
     bool pego;
+    Vector2 posicaoIsca;
+    float tempoIsca;
     float tempoPartida;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
@@ -133,10 +138,19 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) partida->slotSelecionado = partida->slotSelecionado->anterior;
 
     if (IsKeyPressed(KEY_F)) AlternarLanterna(&partida->lanterna);
-    if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) &&
-        partida->slotSelecionado->item == ITEM_BATERIA && RecarregarLanterna(&partida->lanterna)) {
-        RemoverItemHotbar(partida->slotSelecionado);
+    if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        loot *slot = partida->slotSelecionado;
+        if (slot->item == ITEM_BATERIA && RecarregarLanterna(&partida->lanterna)) {
+            RemoverItemHotbar(slot);
+        } else if (slot->item == ITEM_ISCA) {
+            // larga a isca no chao: o inimigo esquece o jogador e vai ate ela
+            RemoverItemHotbar(slot);
+            partida->posicaoIsca = partida->jogador;
+            partida->tempoIsca = DURACAO_ISCA;
+            AtrairInimigo(&partida->inimigo, partida->posicaoIsca, DURACAO_ISCA);
+        }
     }
+    partida->tempoIsca = fmaxf(partida->tempoIsca - deltaTempo, 0.0f);
     AtualizarLanterna(&partida->lanterna, deltaTempo);
 
     Vector2 direcaoMovimento = {0.0f, 0.0f};
@@ -552,6 +566,11 @@ int main(void){
         for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
             const ItemNoMapa *item = &partida.itens[i];
             if (!item->coletado) DesenharItem(item->item, item->posicao, TAMANHO_ITEM_MAPA, bateria);
+        }
+
+        // a isca largada pisca no chao enquanto atrai o inimigo
+        if (partida.tempoIsca > 0.0f && fmodf(partida.tempoIsca, 0.4f) < 0.25f) {
+            DesenharItem(ITEM_ISCA, partida.posicaoIsca, TAMANHO_ITEM_MAPA, bateria);
         }
 
         if (!partida.portaAberta) {
