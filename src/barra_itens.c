@@ -67,6 +67,17 @@ bool RemoverItemHotbar(loot *slot){
     return true;
 }
 
+void EsvaziarHotbar(loot *primeiro){
+    if (primeiro == NULL) return;
+
+    loot *no = primeiro;
+    for (int i = 0; i < 5; i++) {
+        no->item = ITEM_NENHUM;
+        no->quantidade = 0;
+        no = no->proximo;
+    }
+}
+
 void LiberarHotbar(loot *primeiro){
     if (primeiro == NULL) return;
 
