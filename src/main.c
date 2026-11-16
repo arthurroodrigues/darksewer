@@ -668,6 +668,16 @@ int main(void){
         const char *relogio = FormatarTempo(partida.tempoPartida);
         DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
 
+        // objetivo do momento, no rodape da tela
+        const int chavesNaMao = ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
+        const char *objetivo = partida.portaAberta
+            ? "Escape pelo poço"
+            : (chavesNaMao >= QUANTIDADE_CHAVES
+                ? "Leve as chaves até a grade do poço, na sala central"
+                : TextFormat("Encontre as chaves: %d/%d", chavesNaMao, QUANTIDADE_CHAVES));
+        DrawText(objetivo, (larguraTela - MeasureText(objetivo, 20)) / 2, alturaTela - 36, 20,
+                 (Color){150, 112, 72, 255});
+
         if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
             CheckCollisionCircleRec(partida.jogador, RAIO_PORTA, kZonaPorta)) {
             const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
