@@ -31,8 +31,6 @@
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 9.0f
 #define VELOCIDADE_JOGADOR 112.0f
-#define VIDAS_INICIAIS 3
-#define TEMPO_INVULNERAVEL 2.0f
 #define JOGADOR_INICIAL_X 100.0f
 #define JOGADOR_INICIAL_Y 600.0f
 #define ARQUIVO_SPRITE_PARADO "assets\\jogador_parado.png"
@@ -86,8 +84,7 @@ typedef struct {
     bool escapou;
     Lanterna lanterna;
     Inimigo inimigo;
-    int vidas;
-    float tempoInvulneravel;
+    bool pego;
     float tempoPartida;
     loot *slotSelecionado;
     float tempoAnimacaoAndando;
@@ -101,7 +98,6 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
     *partida = (Partida){0};
     partida->jogador = (Vector2){JOGADOR_INICIAL_X, JOGADOR_INICIAL_Y};
     partida->lanterna = CriarLanterna();
-    partida->vidas = VIDAS_INICIAIS;
     partida->slotSelecionado = primeiroSlot;
     EsvaziarHotbar(primeiroSlot);
     DefinirZonaBloqueada(kZonaPorta);
@@ -211,13 +207,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     AtualizarInimigo(&partida->inimigo, partida->jogador,
                      LanternaAcesa(&partida->lanterna), deltaTempo);
 
-    partida->tempoInvulneravel = fmaxf(partida->tempoInvulneravel - deltaTempo, 0.0f);
-    if (partida->tempoInvulneravel <= 0.0f &&
-        InimigoPegouJogador(&partida->inimigo, partida->jogador)) {
-        partida->vidas--;
-        if (partida->vidas > 0) partida->tempoInvulneravel = TEMPO_INVULNERAVEL;
-        AfastarInimigo(&partida->inimigo);
-    }
+    if (InimigoPegouJogador(&partida->inimigo, partida->jogador)) partida->pego = true;
 
     AtualizarPassos(sons, teclasMovimentoPressionadas);
 }
@@ -475,7 +465,7 @@ int main(void){
 
         if (estado == ESTADO_JOGANDO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
-            if (partida.vidas <= 0) estado = ESTADO_FIM;
+            if (partida.pego) estado = ESTADO_FIM;
             else if (partida.escapou) {
                 estado = ESTADO_VITORIA;
                 nomeJogador[0] = '\0';
@@ -600,10 +590,7 @@ int main(void){
             : (partida.olhandoEsquerda
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
-        // pisca enquanto esta invulneravel depois de um golpe
-        const bool jogadorOculto = estado == ESTADO_JOGANDO &&
-            fmodf(partida.tempoInvulneravel, 0.2f) >= 0.1f;
-        if (!jogadorOculto) DesenharJogador(partida.jogador, spriteAtual);
+        DesenharJogador(partida.jogador, spriteAtual);
         if (!inimigoAtras) DesenharInimigo(&partida.inimigo);
 
         EndMode2D();
@@ -614,7 +601,6 @@ int main(void){
 
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
-        DesenharVidas(partida.vidas, VIDAS_INICIAIS, larguraTela);
 
         const char *relogio = FormatarTempo(partida.tempoPartida);
         DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
