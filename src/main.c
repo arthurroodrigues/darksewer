@@ -7,6 +7,7 @@
 #include "lanterna.h"
 #include "inimigo.h"
 #include "ranking.h"
+#include "ordem_desenho.h"
 #include "raymath.h"
 #include <math.h>
 #include <stdio.h>
@@ -585,16 +586,6 @@ int main(void){
         const Rectangle origemMapa = {0.0f, 0.0f, (float)mapa.width, (float)mapa.height};
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
-        for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
-            const ItemNoMapa *item = &partida.itens[i];
-            if (!item->coletado) DesenharItem(item->item, item->posicao, TAMANHO_ITEM_MAPA, bateria);
-        }
-
-        // a isca largada pisca no chao enquanto atrai o inimigo
-        if (partida.tempoIsca > 0.0f && fmodf(partida.tempoIsca, 0.4f) < 0.25f) {
-            DesenharItem(ITEM_ISCA, partida.posicaoIsca, TAMANHO_ITEM_MAPA, bateria);
-        }
-
         if (!partida.portaAberta) {
             // grade de ferro sobre a porta trancada
             DrawRectangleRec((Rectangle){479.0f, 503.0f, 26.0f, 5.0f}, (Color){28, 30, 32, 235});
@@ -603,10 +594,6 @@ int main(void){
             }
         }
 
-        // quem esta mais abaixo na tela fica na frente
-        const bool inimigoAtras = partida.inimigo.posicao.y <= partida.jogador.y;
-        if (inimigoAtras) DesenharInimigo(&partida.inimigo);
-
         const Texture2D spriteAtual = partida.olhandoVertical
             ? (partida.olhandoParaFrente
                 ? (partida.quadroAnimacaoAndando ? spriteFrente : spriteParadoFrente)
@@ -614,8 +601,41 @@ int main(void){
             : (partida.olhandoEsquerda
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
-        DesenharJogador(partida.jogador, spriteAtual);
-        if (!inimigoAtras) DesenharInimigo(&partida.inimigo);
+
+        // Tudo que fica no chao entra numa lista ordenada pela base:
+        // quem esta mais abaixo na tela e desenhado por ultimo e fica na frente.
+        ElementoDesenho elementos[QUANTIDADE_ITENS_MAPA + 3];
+        int quantidadeElementos = 0;
+        const float baseItem = TAMANHO_ITEM_MAPA * 0.5f;
+
+        for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+            if (partida.itens[i].coletado) continue;
+            elementos[quantidadeElementos++] =
+                (ElementoDesenho){partida.itens[i].posicao.y + baseItem, DESENHO_ITEM, i};
+        }
+        // a isca largada pisca no chao enquanto atrai o inimigo
+        if (partida.tempoIsca > 0.0f && fmodf(partida.tempoIsca, 0.4f) < 0.25f) {
+            elementos[quantidadeElementos++] =
+                (ElementoDesenho){partida.posicaoIsca.y + baseItem, DESENHO_ISCA, 0};
+        }
+        elementos[quantidadeElementos++] = (ElementoDesenho){partida.inimigo.posicao.y, DESENHO_INIMIGO, 0};
+        elementos[quantidadeElementos++] = (ElementoDesenho){partida.jogador.y, DESENHO_JOGADOR, 0};
+
+        OrdenarPorProfundidade(elementos, quantidadeElementos);
+
+        for (int i = 0; i < quantidadeElementos; i++) {
+            switch (elementos[i].tipo) {
+                case DESENHO_ITEM: {
+                    const ItemNoMapa *item = &partida.itens[elementos[i].indice];
+                    DesenharItem(item->item, item->posicao, TAMANHO_ITEM_MAPA, bateria);
+                } break;
+                case DESENHO_ISCA:
+                    DesenharItem(ITEM_ISCA, partida.posicaoIsca, TAMANHO_ITEM_MAPA, bateria);
+                    break;
+                case DESENHO_INIMIGO: DesenharInimigo(&partida.inimigo); break;
+                case DESENHO_JOGADOR: DesenharJogador(partida.jogador, spriteAtual); break;
+            }
+        }
 
         EndMode2D();
 
