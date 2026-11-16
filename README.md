@@ -32,7 +32,6 @@ O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanter
 |------|-----------|
 | Bateria | Recarrega a lanterna. A carga cheia dura 90 segundos com a lanterna acesa. |
 | Chave | São três. Abrem a grade do poço. |
-| Isca | Largada no chão, atrai o palhaço por 8 segundos, mesmo que ele esteja perseguindo você. |
 | Bússola | Enquanto está selecionada, mostra uma seta para a chave mais próxima. Depois aponta para a grade e para o poço. |
 
 ## Ranking
