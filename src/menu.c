@@ -64,6 +64,6 @@ void DesenharTelaPausa(int larguraTela, int alturaTela){
 }
 
 void DesenharTelaFim(int larguraTela, int alturaTela){
-    const char *const opcoes[] = {"ENTER - Voltar ao menu"};
-    DesenharTelaSobreposta("VOCÊ FOI PEGO", opcoes, 1, larguraTela, alturaTela);
+    const char *const opcoes[] = {"ENTER - Tentar de novo", "M - Voltar ao menu"};
+    DesenharTelaSobreposta("VOCÊ FOI PEGO", opcoes, 2, larguraTela, alturaTela);
 }

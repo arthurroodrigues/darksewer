@@ -6,7 +6,8 @@
 typedef enum {
     INIMIGO_PATRULHANDO,
     INIMIGO_PERSEGUINDO,
-    INIMIGO_PROCURANDO
+    INIMIGO_PROCURANDO,
+    INIMIGO_RECUANDO
 } EstadoInimigo;
 
 typedef struct {
@@ -14,6 +15,7 @@ typedef struct {
     EstadoInimigo estado;
     float tempoRecalculo;
     float tempoProcurando;
+    float tempoRecuando;
     float tempoAnimacaoAndando;
     bool olhandoEsquerda;
     bool olhandoParaFrente;
@@ -27,5 +29,6 @@ void DesenharInimigo(const Inimigo *inimigo);
 bool PosicionarInimigo(Inimigo *inimigo, Vector2 posicaoJogador);
 void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa, float deltaTempo);
 bool InimigoPegouJogador(const Inimigo *inimigo, Vector2 posicaoJogador);
+void AfastarInimigo(Inimigo *inimigo);
 
 #endif

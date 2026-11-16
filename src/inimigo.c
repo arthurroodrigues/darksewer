@@ -14,6 +14,8 @@
 #define TEMPO_PROCURANDO 3.0f
 #define DISTANCIA_MINIMA_NASCIMENTO 250.0f
 #define DISTANCIA_MINIMA_PATRULHA 80.0f
+#define DISTANCIA_MINIMA_RECUO 150.0f
+#define TEMPO_RECUANDO 4.0f
 #define INTERVALO_ANIMACAO_INIMIGO 0.18f
 #define ALTURA_SPRITE_INIMIGO 34.0f
 #define QUANTIDADE_SPRITES_INIMIGO 6
@@ -116,6 +118,16 @@ bool PosicionarInimigo(Inimigo *inimigo, Vector2 posicaoJogador){
 }
 
 void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa, float deltaTempo){
+    if (inimigo->estado == INIMIGO_RECUANDO) {
+        inimigo->tempoRecuando -= deltaTempo;
+        if (inimigo->tempoRecuando > 0.0f) {
+            Andar(inimigo, VELOCIDADE_PERSEGUICAO * deltaTempo, deltaTempo);
+            return;
+        }
+        // segue ate o mesmo ponto, mas volta a prestar atencao no jogador
+        inimigo->estado = INIMIGO_PATRULHANDO;
+    }
+
     const float alcance = lanternaAcesa ? ALCANCE_VISAO_LANTERNA_ACESA : ALCANCE_VISAO_ESCURO;
     const bool vendoJogador =
         Vector2DistanceSqr(inimigo->posicao, posicaoJogador) <= alcance * alcance &&
@@ -144,6 +156,17 @@ void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAce
     const float velocidade = inimigo->estado == INIMIGO_PATRULHANDO
         ? VELOCIDADE_PATRULHA : VELOCIDADE_PERSEGUICAO;
     Andar(inimigo, velocidade * deltaTempo, deltaTempo);
+}
+
+void AfastarInimigo(Inimigo *inimigo){
+    Vector2 alvo;
+
+    inimigo->estado = INIMIGO_RECUANDO;
+    inimigo->tempoRecuando = TEMPO_RECUANDO;
+    if (EncontrarPosicaoAcessivelAleatoria(inimigo->posicao, DISTANCIA_MINIMA_RECUO,
+                                           NULL, 0, 0.0f, &alvo)) {
+        AtualizarMapaDistancias(alvo);
+    }
 }
 
 bool InimigoPegouJogador(const Inimigo *inimigo, Vector2 posicaoJogador){
