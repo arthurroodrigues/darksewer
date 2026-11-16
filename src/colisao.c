@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "raymath.h"
 
-#define PAREDES_ARQUIVO "assets\\mapa_paredes.png"
+#define PAREDES_ARQUIVO "assets/mapa_paredes.png"
 #define MEIA_LARGURA_HITBOX_PES 2.5f
 #define ALTURA_HITBOX_PES 2.0f
 #define DESLOCAMENTO_HITBOX_PES_Y 2.0f

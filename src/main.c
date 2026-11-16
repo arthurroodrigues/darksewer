@@ -13,9 +13,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#define MAPA_ARQUIVO "assets\\mapa.png"
-#define TELA_INICIAL_ARQUIVO "assets\\tela_de_inicio.png"
-#define BATERIA_ARQUIVO "assets\\bateria.png"
+#define MAPA_ARQUIVO "assets/mapa.png"
+#define TELA_INICIAL_ARQUIVO "assets/tela_de_inicio.png"
+#define BATERIA_ARQUIVO "assets/bateria.png"
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 7.5f
 #define INTENSIDADE_ESCURO 0.99f
@@ -33,14 +33,14 @@
 #define VELOCIDADE_JOGADOR 112.0f
 #define JOGADOR_INICIAL_X 100.0f
 #define JOGADOR_INICIAL_Y 600.0f
-#define ARQUIVO_SPRITE_PARADO "assets\\jogador_parado.png"
-#define ARQUIVO_SPRITE_ANDANDO "assets\\jogador_andando.png"
-#define ARQUIVO_SPRITE_PARADO_ESQUERDA "assets\\jogador_parado_esquerda.png"
-#define ARQUIVO_SPRITE_ANDANDO_ESQUERDA "assets\\jogador_andando_esquerda.png"
-#define ARQUIVO_SPRITE_FRENTE "assets\\jogador_andando_para_frente.png"
-#define ARQUIVO_SPRITE_PARADO_FRENTE "assets\\jogador_parado_para_frente.png"
-#define ARQUIVO_SPRITE_TRAS "assets\\jogador_andando_para_tras.png"
-#define ARQUIVO_SPRITE_PARADO_TRAS "assets\\jogador_parado_para_tras.png"
+#define ARQUIVO_SPRITE_PARADO "assets/jogador_parado.png"
+#define ARQUIVO_SPRITE_ANDANDO "assets/jogador_andando.png"
+#define ARQUIVO_SPRITE_PARADO_ESQUERDA "assets/jogador_parado_esquerda.png"
+#define ARQUIVO_SPRITE_ANDANDO_ESQUERDA "assets/jogador_andando_esquerda.png"
+#define ARQUIVO_SPRITE_FRENTE "assets/jogador_andando_para_frente.png"
+#define ARQUIVO_SPRITE_PARADO_FRENTE "assets/jogador_parado_para_frente.png"
+#define ARQUIVO_SPRITE_TRAS "assets/jogador_andando_para_tras.png"
+#define ARQUIVO_SPRITE_PARADO_TRAS "assets/jogador_parado_para_tras.png"
 #define LARGURA_JANELA 960
 #define ALTURA_JANELA 720
 #define ARQUIVO_RANKING "ranking.txt"
@@ -249,6 +249,9 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 }
 
 int main(void){
+    // os arquivos do jogo ficam ao lado do executavel, nao importa de onde ele foi aberto
+    ChangeDirectory(GetApplicationDirectory());
+
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(LARGURA_JANELA, ALTURA_JANELA, "Dark Sewer");
     SetWindowMinSize(480, 360);
