@@ -56,6 +56,17 @@ bool AdicionarItemHotbar(loot *primeiro, ItemHotbar item){
     return false;
 }
 
+bool RemoverItemHotbar(loot *slot){
+    if (slot == NULL || slot->item == ITEM_NENHUM) return false;
+
+    slot->quantidade--;
+    if (slot->quantidade <= 0) {
+        slot->item = ITEM_NENHUM;
+        slot->quantidade = 0;
+    }
+    return true;
+}
+
 void LiberarHotbar(loot *primeiro){
     if (primeiro == NULL) return;
 

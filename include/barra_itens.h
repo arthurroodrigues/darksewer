@@ -20,6 +20,7 @@ typedef struct loot {
 loot *CriarHotbar(void);
 void LiberarHotbar(loot *primeiro);
 bool AdicionarItemHotbar(loot *primeiro, ItemHotbar item);
+bool RemoverItemHotbar(loot *slot);
 void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria);
 
 #endif

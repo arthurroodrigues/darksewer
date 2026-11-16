@@ -4,6 +4,7 @@
 #include "barra_itens.h"
 #include "menu.h"
 #include "jogador.h"
+#include "lanterna.h"
 #include "raymath.h"
 #include <math.h>
 #include <time.h>
@@ -13,7 +14,6 @@
 #define BATERIA_ARQUIVO "assets\\bateria.png"
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 7.5f
-#define RAIO_LANTERNA 70.0f
 #define INTENSIDADE_ESCURO 0.99f
 #define TAMANHO_BATERIA_MAPA 15.0f
 #define RAIO_COLETA_BATERIA 12.5f
@@ -248,6 +248,7 @@ int main(void){
     }
     loot *slotSelecionado = primeiroSlot;
     bool bateriasColetadas[QUANTIDADE_BATERIAS] = {false};
+    Lanterna lanterna = CriarLanterna();
 
     while (!WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
@@ -278,6 +279,13 @@ int main(void){
 
         if (IsKeyPressed(KEY_E) || GetMouseWheelMove() < 0.0f) slotSelecionado = slotSelecionado->proximo;
         if (IsKeyPressed(KEY_Q) || GetMouseWheelMove() > 0.0f) slotSelecionado = slotSelecionado->anterior;
+
+        if (IsKeyPressed(KEY_F)) AlternarLanterna(&lanterna);
+        if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) &&
+            slotSelecionado->item == ITEM_BATERIA && RecarregarLanterna(&lanterna)) {
+            RemoverItemHotbar(slotSelecionado);
+        }
+        AtualizarLanterna(&lanterna, deltaTempo);
 
         Vector2 direcaoMovimento = {0.0f, 0.0f};
 
@@ -347,7 +355,7 @@ int main(void){
             (float)alturaTela - posicaoJogadorNaTela.y
         };
 
-        const float raioLuzShader = RAIO_LANTERNA * camera.zoom;
+        const float raioLuzShader = RaioLanterna(&lanterna) * camera.zoom;
 
         SetShaderValue(shaderLanterna, localLuzShader, &posicaoLuzShader, SHADER_UNIFORM_VEC2);
         SetShaderValue(shaderLanterna, localRaioShader, &raioLuzShader, SHADER_UNIFORM_FLOAT);
@@ -394,6 +402,7 @@ int main(void){
         EndShaderMode();
 
         DesenharHotbar(primeiroSlot, slotSelecionado, bateria);
+        DesenharCargaLanterna(&lanterna, larguraTela);
 
         EndDrawing();
     }
