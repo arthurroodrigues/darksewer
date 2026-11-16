@@ -1,4 +1,5 @@
 #include "menu.h"
+#include "ranking.h"
 #include <math.h>
 
 Rectangle CalcularDestinoTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela){
@@ -40,6 +41,10 @@ void DesenharTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela,
     DrawTexturePro(imagemFundo, origemImagemFundo, destinoImagemFundo,
                    (Vector2){0.0f, 0.0f}, 0.0f,
                    (Color){255, 255, 255, (unsigned char)(255.0f * opacidade)});
+
+    const char *atalho = "R - Ranking";
+    DrawText(atalho, (larguraTela - MeasureText(atalho, 20)) / 2, alturaTela - 40, 20,
+             (Color){214, 204, 190, (unsigned char)(200.0f * opacidade)});
 }
 
 static void DesenharTelaSobreposta(const char *titulo, const char *const *opcoes, int quantidadeOpcoes,
@@ -68,7 +73,11 @@ void DesenharTelaFim(int larguraTela, int alturaTela){
     DesenharTelaSobreposta("VOCÊ FOI PEGO", opcoes, 2, larguraTela, alturaTela);
 }
 
-void DesenharTelaVitoria(int larguraTela, int alturaTela){
-    const char *const opcoes[] = {"ENTER - Jogar de novo", "M - Voltar ao menu"};
-    DesenharTelaSobreposta("VOCÊ ESCAPOU", opcoes, 2, larguraTela, alturaTela);
+void DesenharTelaVitoria(int larguraTela, int alturaTela, float tempo, const char *nome){
+    const char *const opcoes[] = {
+        TextFormat("Tempo: %s", FormatarTempo(tempo)),
+        TextFormat("Seu nome: %s_", nome),
+        "ENTER - Confirmar"
+    };
+    DesenharTelaSobreposta("VOCÊ ESCAPOU", opcoes, 3, larguraTela, alturaTela);
 }
