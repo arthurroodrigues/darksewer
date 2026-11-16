@@ -7,7 +7,8 @@ typedef enum {
     ITEM_NENHUM,
     ITEM_BATERIA,
     ITEM_CHAVE,
-    ITEM_ISCA
+    ITEM_ISCA,
+    ITEM_BUSSOLA
 } ItemHotbar;
 
 #define QUANTIDADE_MAXIMA_POR_SLOT 3

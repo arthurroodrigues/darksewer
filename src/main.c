@@ -23,7 +23,9 @@
 #define QUANTIDADE_CHAVES 3
 #define QUANTIDADE_BATERIAS 3
 #define QUANTIDADE_ISCAS 2
-#define QUANTIDADE_ITENS_MAPA (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS + QUANTIDADE_ISCAS)
+#define QUANTIDADE_BUSSOLAS 1
+#define QUANTIDADE_ITENS_MAPA \
+    (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS + QUANTIDADE_ISCAS + QUANTIDADE_BUSSOLAS)
 #define DURACAO_ISCA 8.0f
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 9.0f
@@ -63,6 +65,7 @@ static const struct {
     {ITEM_CHAVE, QUANTIDADE_CHAVES, 150.0f, 150.0f},
     {ITEM_BATERIA, QUANTIDADE_BATERIAS, 24.0f, 32.0f},
     {ITEM_ISCA, QUANTIDADE_ISCAS, 60.0f, 32.0f},
+    {ITEM_BUSSOLA, QUANTIDADE_BUSSOLAS, 60.0f, 32.0f},
 };
 
 static const char *kShaderLanterna =
@@ -107,6 +110,25 @@ typedef struct {
     bool olhandoVertical;
     bool quadroAnimacaoAndando;
 } Partida;
+
+// Para onde a bussola aponta: a chave mais proxima ainda no mapa;
+// sem chaves para pegar, a porta; com a porta aberta, o bueiro.
+static Vector2 AlvoDaBussola(const Partida *partida){
+    Vector2 alvo = partida->portaAberta ? kBueiro : kCentroPorta;
+    float menorDistancia = -1.0f;
+
+    for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+        const ItemNoMapa *item = &partida->itens[i];
+        if (item->item != ITEM_CHAVE || item->coletado) continue;
+
+        const float distancia = Vector2DistanceSqr(partida->jogador, item->posicao);
+        if (menorDistancia < 0.0f || distancia < menorDistancia) {
+            menorDistancia = distancia;
+            alvo = item->posicao;
+        }
+    }
+    return alvo;
+}
 
 static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
     *partida = (Partida){0};
@@ -600,6 +622,19 @@ int main(void){
         BeginShaderMode(shaderLanterna);
             DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
         EndShaderMode();
+
+        if (estado == ESTADO_JOGANDO && partida.slotSelecionado->item == ITEM_BUSSOLA) {
+            // seta em volta do jogador, apontando para o alvo da bussola
+            const Vector2 centro = GetWorldToScreen2D(
+                (Vector2){partida.jogador.x, partida.jogador.y - 12.0f}, camera);
+            const Vector2 alvo = GetWorldToScreen2D(AlvoDaBussola(&partida), camera);
+            const Vector2 direcao = Vector2Normalize(Vector2Subtract(alvo, centro));
+            const Vector2 lateral = {-direcao.y, direcao.x};
+            const Vector2 base = Vector2Add(centro, Vector2Scale(direcao, 78.0f));
+            DrawTriangle(Vector2Add(centro, Vector2Scale(direcao, 104.0f)),
+                         Vector2Subtract(base, Vector2Scale(lateral, 11.0f)),
+                         Vector2Add(base, Vector2Scale(lateral, 11.0f)), (Color){212, 175, 55, 255});
+        }
 
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);

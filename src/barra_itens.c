@@ -169,6 +169,21 @@ static void DesenharIsca(Vector2 centro, float tamanho){
     DrawRectangleRec((Rectangle){centro.x, centro.y - raio * 0.07f, raio * 0.4f, raio * 0.14f}, vermelho);
 }
 
+// Bussola desenhada com formas: aro dourado e agulha de duas cores.
+static void DesenharBussola(Vector2 centro, float tamanho){
+    const float raio = tamanho * 0.42f;
+    const float meiaLargura = raio * 0.22f;
+
+    DrawCircleV(centro, raio, (Color){212, 175, 55, 255});
+    DrawCircleV(centro, raio * 0.8f, (Color){24, 28, 30, 255});
+    DrawTriangle((Vector2){centro.x, centro.y - raio * 0.7f},
+                 (Vector2){centro.x - meiaLargura, centro.y},
+                 (Vector2){centro.x + meiaLargura, centro.y}, (Color){190, 50, 40, 255});
+    DrawTriangle((Vector2){centro.x, centro.y + raio * 0.7f},
+                 (Vector2){centro.x + meiaLargura, centro.y},
+                 (Vector2){centro.x - meiaLargura, centro.y}, (Color){230, 220, 200, 255});
+}
+
 // Desenha um item centrado em um ponto, cabendo em um quadrado de lado `tamanho`.
 void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bateria){
     if (item == ITEM_BATERIA && bateria.id != 0) {
@@ -183,5 +198,7 @@ void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bate
         DesenharChave(centro, tamanho);
     } else if (item == ITEM_ISCA) {
         DesenharIsca(centro, tamanho);
+    } else if (item == ITEM_BUSSOLA) {
+        DesenharBussola(centro, tamanho);
     }
 }
