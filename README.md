@@ -1,12 +1,12 @@
 # Dark Sewer
 
-Jogo de terror em C com [raylib](https://www.raylib.com/). Você está preso em um esgoto escuro, com uma lanterna que gasta bateria e um palhaço que anda pelos túneis. Para escapar é preciso achar três chaves, abrir a porta da sala do bueiro e sair por ele.
+Jogo de terror em C com [raylib](https://www.raylib.com/). Você está preso em um esgoto escuro, com uma lanterna que gasta bateria e um palhaço que anda pelos túneis. Para escapar é preciso achar três chaves, abrir a grade que fecha o poço e sair por ele.
 
 ## Objetivo
 
 1. Explore o esgoto e encontre as **3 chaves**.
-2. Leve as chaves até a **porta com grade**, ao sul do corredor central. Ela abre sozinha quando você chega com as três.
-3. Pise no **bueiro** dentro da sala para escapar.
+2. Leve as chaves até a **grade de ferro** que fecha o poço, na sala central. Ela abre sozinha quando você chega com as três.
+3. Pise no **poço** para escapar.
 
 Se o palhaço encostar em você, a partida acaba.
 
@@ -31,9 +31,9 @@ O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanter
 | Item | O que faz |
 |------|-----------|
 | Bateria | Recarrega a lanterna. A carga cheia dura 90 segundos com a lanterna acesa. |
-| Chave | São três. Abrem a porta da sala do bueiro. |
+| Chave | São três. Abrem a grade do poço. |
 | Isca | Largada no chão, atrai o palhaço por 8 segundos, mesmo que ele esteja perseguindo você. |
-| Bússola | Enquanto está selecionada, mostra uma seta para a chave mais próxima. Depois aponta para a porta e para o bueiro. |
+| Bússola | Enquanto está selecionada, mostra uma seta para a chave mais próxima. Depois aponta para a grade e para o poço. |
 
 ## Ranking
 
@@ -111,5 +111,4 @@ Módulos principais em `src/`:
 
 ## Créditos
 
-- Arte do mapa: GØDXMODE.
 - Biblioteca gráfica e de áudio: [raylib](https://www.raylib.com/).

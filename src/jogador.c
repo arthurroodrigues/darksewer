@@ -1,6 +1,6 @@
 #include "jogador.h"
 
-#define ALTURA_SPRITE_JOGADOR 25.5f
+#define ALTURA_SPRITE_JOGADOR 18.0f
 
 void DesenharPersonagem(Vector2 posicao, Texture2D sprite, float alturaNoMapa, bool espelhado){
     const float escala = alturaNoMapa / (float)sprite.height;

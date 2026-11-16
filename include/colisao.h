@@ -3,8 +3,8 @@
 
 #include "raylib.h"
 
-#define MAPA_LARGURA 768
-#define MAPA_ALTURA 768
+#define MAPA_LARGURA 552
+#define MAPA_ALTURA 712
 
 bool CarregarMascaraParedes(void);
 void LiberarMascaraParedes(void);

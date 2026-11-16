@@ -15,7 +15,7 @@
 #define DISTANCIA_MINIMA_NASCIMENTO 250.0f
 #define DISTANCIA_MINIMA_PATRULHA 80.0f
 #define INTERVALO_ANIMACAO_INIMIGO 0.18f
-#define ALTURA_SPRITE_INIMIGO 34.0f
+#define ALTURA_SPRITE_INIMIGO 24.0f
 #define QUANTIDADE_SPRITES_INIMIGO 6
 
 // ordem: de lado, de frente e de costas; em cada par, parado e andando

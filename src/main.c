@@ -19,8 +19,8 @@
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 7.5f
 #define INTENSIDADE_ESCURO 0.99f
-#define TAMANHO_ITEM_MAPA 13.0f
-#define RAIO_COLETA_ITEM 12.5f
+#define TAMANHO_ITEM_MAPA 9.0f
+#define RAIO_COLETA_ITEM 10.0f
 #define QUANTIDADE_CHAVES 3
 #define QUANTIDADE_BATERIAS 3
 #define QUANTIDADE_ISCAS 2
@@ -29,10 +29,10 @@
     (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS + QUANTIDADE_ISCAS + QUANTIDADE_BUSSOLAS)
 #define DURACAO_ISCA 8.0f
 #define RAIO_PORTA 16.0f
-#define RAIO_BUEIRO 9.0f
+#define RAIO_BUEIRO 10.0f
 #define VELOCIDADE_JOGADOR 112.0f
 #define JOGADOR_INICIAL_X 100.0f
-#define JOGADOR_INICIAL_Y 600.0f
+#define JOGADOR_INICIAL_Y 590.0f
 #define ARQUIVO_SPRITE_PARADO "assets/jogador_parado.png"
 #define ARQUIVO_SPRITE_ANDANDO "assets/jogador_andando.png"
 #define ARQUIVO_SPRITE_PARADO_ESQUERDA "assets/jogador_parado_esquerda.png"
@@ -45,10 +45,10 @@
 #define ALTURA_JANELA 720
 #define ARQUIVO_RANKING "ranking.txt"
 
-// porta da sala do bueiro, por onde o jogador escapa
-static const Rectangle kZonaPorta = {478.0f, 502.0f, 28.0f, 8.0f};
-static const Vector2 kCentroPorta = {492.0f, 506.0f};
-static const Vector2 kBueiro = {491.0f, 585.0f};
+// grade que fecha o recuo do poco, na sala central; o jogador escapa pelo poco
+static const Rectangle kZonaPorta = {250.0f, 242.0f, 70.0f, 8.0f};
+static const Vector2 kCentroPorta = {285.0f, 246.0f};
+static const Vector2 kBueiro = {287.0f, 310.0f};
 
 typedef struct {
     Vector2 posicao;
@@ -203,7 +203,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     }
 
     if (!partida->portaAberta &&
-        Vector2DistanceSqr(partida->jogador, kCentroPorta) <= RAIO_PORTA * RAIO_PORTA &&
+        CheckCollisionCircleRec(partida->jogador, RAIO_PORTA, kZonaPorta) &&
         ContarItemHotbar(primeiroSlot, ITEM_CHAVE) >= QUANTIDADE_CHAVES) {
         RemoverTodosDoItemHotbar(primeiroSlot, ITEM_CHAVE);
         partida->portaAberta = true;
@@ -271,6 +271,8 @@ int main(void){
         CloseWindow();
         return 1;
     }
+
+    SetTextureFilter(mapa, TEXTURE_FILTER_BILINEAR);
 
     if (mapa.width <= 0 || mapa.height <= 0) {
         TraceLog(LOG_ERROR, "mapa.png tem dimensoes invalidas (%d x %d).", mapa.width, mapa.height);
@@ -590,10 +592,11 @@ int main(void){
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         if (!partida.portaAberta) {
-            // grade de ferro sobre a porta trancada
-            DrawRectangleRec((Rectangle){479.0f, 503.0f, 26.0f, 5.0f}, (Color){28, 30, 32, 235});
-            for (float x = 480.0f; x < 505.0f; x += 4.0f) {
-                DrawRectangleRec((Rectangle){x, 502.0f, 1.0f, 7.0f}, (Color){96, 102, 106, 255});
+            // grade de ferro fechando a passagem
+            DrawRectangleRec((Rectangle){kZonaPorta.x, kZonaPorta.y + 2.0f,
+                                         kZonaPorta.width, kZonaPorta.height - 4.0f}, (Color){28, 30, 32, 235});
+            for (float x = kZonaPorta.x + 1.0f; x < kZonaPorta.x + kZonaPorta.width; x += 4.0f) {
+                DrawRectangleRec((Rectangle){x, kZonaPorta.y, 1.0f, kZonaPorta.height}, (Color){96, 102, 106, 255});
             }
         }
 
@@ -649,7 +652,7 @@ int main(void){
         if (estado == ESTADO_JOGANDO && partida.slotSelecionado->item == ITEM_BUSSOLA) {
             // seta em volta do jogador, apontando para o alvo da bussola
             const Vector2 centro = GetWorldToScreen2D(
-                (Vector2){partida.jogador.x, partida.jogador.y - 12.0f}, camera);
+                (Vector2){partida.jogador.x, partida.jogador.y - 9.0f}, camera);
             const Vector2 alvo = GetWorldToScreen2D(AlvoDaBussola(&partida), camera);
             const Vector2 direcao = Vector2Normalize(Vector2Subtract(alvo, centro));
             const Vector2 lateral = {-direcao.y, direcao.x};
@@ -666,7 +669,7 @@ int main(void){
         DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
 
         if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
-            Vector2DistanceSqr(partida.jogador, kCentroPorta) <= RAIO_PORTA * RAIO_PORTA) {
+            CheckCollisionCircleRec(partida.jogador, RAIO_PORTA, kZonaPorta)) {
             const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
             const char *aviso = faltam == 1 ? "Falta 1 chave" : TextFormat("Faltam %d chaves", faltam);
             DrawText(aviso, (larguraTela - MeasureText(aviso, 24)) / 2, alturaTela - 70, 24,
