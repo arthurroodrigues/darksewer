@@ -245,7 +245,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 
     if (InimigoPegouJogador(&partida->inimigo, partida->jogador)) partida->pego = true;
 
-    AtualizarPassos(sons, teclasMovimentoPressionadas);
+    AtualizarPassos(sons, jogadorEstaSeMovendo);
 }
 
 int main(void){
