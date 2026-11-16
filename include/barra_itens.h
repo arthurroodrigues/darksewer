@@ -5,7 +5,8 @@
 
 typedef enum {
     ITEM_NENHUM,
-    ITEM_BATERIA
+    ITEM_BATERIA,
+    ITEM_CHAVE
 } ItemHotbar;
 
 #define QUANTIDADE_MAXIMA_POR_SLOT 3
@@ -22,6 +23,9 @@ void LiberarHotbar(loot *primeiro);
 bool AdicionarItemHotbar(loot *primeiro, ItemHotbar item);
 bool RemoverItemHotbar(loot *slot);
 void EsvaziarHotbar(loot *primeiro);
+int ContarItemHotbar(loot *primeiro, ItemHotbar item);
+void RemoverTodosDoItemHotbar(loot *primeiro, ItemHotbar item);
+void DesenharChave(Vector2 centro, float tamanho);
 void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria);
 
 #endif

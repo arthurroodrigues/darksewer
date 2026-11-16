@@ -21,6 +21,13 @@
 #define DISTANCIA_MINIMA_SPAWN_BATERIA 24.0f
 #define DISTANCIA_MINIMA_ENTRE_BATERIAS 32.0f
 #define QUANTIDADE_BATERIAS 3
+#define QUANTIDADE_CHAVES 3
+#define TAMANHO_CHAVE_MAPA 12.0f
+#define RAIO_COLETA_CHAVE 12.5f
+#define DISTANCIA_MINIMA_SPAWN_CHAVE 150.0f
+#define DISTANCIA_MINIMA_ENTRE_CHAVES 150.0f
+#define RAIO_PORTA 16.0f
+#define RAIO_BUEIRO 9.0f
 #define VELOCIDADE_JOGADOR 112.0f
 #define VIDAS_INICIAIS 3
 #define TEMPO_INVULNERAVEL 2.0f
@@ -36,6 +43,11 @@
 #define ARQUIVO_SPRITE_PARADO_TRAS "assets\\jogador_parado_para_tras.png"
 #define LARGURA_JANELA 960
 #define ALTURA_JANELA 720
+
+// porta da sala do bueiro, por onde o jogador escapa
+static const Rectangle kZonaPorta = {478.0f, 502.0f, 28.0f, 8.0f};
+static const Vector2 kCentroPorta = {492.0f, 506.0f};
+static const Vector2 kBueiro = {491.0f, 585.0f};
 
 static const char *kShaderLanterna =
     "#version 330\n"
@@ -56,13 +68,18 @@ typedef enum {
     ESTADO_MENU,
     ESTADO_JOGANDO,
     ESTADO_PAUSADO,
-    ESTADO_FIM
+    ESTADO_FIM,
+    ESTADO_VITORIA
 } EstadoJogo;
 
 typedef struct {
     Vector2 jogador;
     Vector2 posicoesBateria[QUANTIDADE_BATERIAS];
     bool bateriasColetadas[QUANTIDADE_BATERIAS];
+    Vector2 posicoesChave[QUANTIDADE_CHAVES];
+    bool chavesColetadas[QUANTIDADE_CHAVES];
+    bool portaAberta;
+    bool escapou;
     Lanterna lanterna;
     Inimigo inimigo;
     int vidas;
@@ -82,12 +99,19 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
     partida->vidas = VIDAS_INICIAIS;
     partida->slotSelecionado = primeiroSlot;
     EsvaziarHotbar(primeiroSlot);
+    DefinirZonaBloqueada(kZonaPorta);
 
     for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
         if (!EncontrarPosicaoAcessivelAleatoria(
                 partida->jogador, DISTANCIA_MINIMA_SPAWN_BATERIA,
                 partida->posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
                 &partida->posicoesBateria[i])) return false;
+    }
+    for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
+        if (!EncontrarPosicaoAcessivelAleatoria(
+                partida->jogador, DISTANCIA_MINIMA_SPAWN_CHAVE,
+                partida->posicoesChave, i, DISTANCIA_MINIMA_ENTRE_CHAVES,
+                &partida->posicoesChave[i])) return false;
     }
     return PosicionarInimigo(&partida->inimigo, partida->jogador);
 }
@@ -128,6 +152,29 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
                 AdicionarItemHotbar(primeiroSlot, ITEM_BATERIA);
             if (partida->bateriasColetadas[i]) TocarSomColeta(sons);
         }
+    }
+
+    for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
+        if (!partida->chavesColetadas[i] &&
+            Vector2DistanceSqr(partida->jogador, partida->posicoesChave[i]) <=
+                RAIO_COLETA_CHAVE * RAIO_COLETA_CHAVE) {
+            partida->chavesColetadas[i] = AdicionarItemHotbar(primeiroSlot, ITEM_CHAVE);
+            if (partida->chavesColetadas[i]) TocarSomColeta(sons);
+        }
+    }
+
+    if (!partida->portaAberta &&
+        Vector2DistanceSqr(partida->jogador, kCentroPorta) <= RAIO_PORTA * RAIO_PORTA &&
+        ContarItemHotbar(primeiroSlot, ITEM_CHAVE) >= QUANTIDADE_CHAVES) {
+        RemoverTodosDoItemHotbar(primeiroSlot, ITEM_CHAVE);
+        partida->portaAberta = true;
+        DefinirZonaBloqueada((Rectangle){0});
+        TocarSomColeta(sons);
+    }
+
+    if (partida->portaAberta &&
+        Vector2DistanceSqr(partida->jogador, kBueiro) <= RAIO_BUEIRO * RAIO_BUEIRO) {
+        partida->escapou = true;
     }
 
     if (jogadorEstaSeMovendo) {
@@ -379,17 +426,19 @@ int main(void){
             continue;
         }
 
-        if (estado != ESTADO_FIM && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))) {
+        if ((estado == ESTADO_JOGANDO || estado == ESTADO_PAUSADO) &&
+            (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P))) {
             estado = (estado == ESTADO_JOGANDO) ? ESTADO_PAUSADO : ESTADO_JOGANDO;
         }
 
         if (estado == ESTADO_JOGANDO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
             if (partida.vidas <= 0) estado = ESTADO_FIM;
+            else if (partida.escapou) estado = ESTADO_VITORIA;
         } else {
             AtualizarPassos(&sonsJogo, false);
             if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
-            if (estado == ESTADO_FIM && IsKeyPressed(KEY_ENTER)) {
+            if ((estado == ESTADO_FIM || estado == ESTADO_VITORIA) && IsKeyPressed(KEY_ENTER)) {
                 if (!IniciarPartida(&partida, primeiroSlot)) {
                     codigoSaida = 1;
                     break;
@@ -448,6 +497,18 @@ int main(void){
                            (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         }
 
+        for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
+            if (!partida.chavesColetadas[i]) DesenharChave(partida.posicoesChave[i], TAMANHO_CHAVE_MAPA);
+        }
+
+        if (!partida.portaAberta) {
+            // grade de ferro sobre a porta trancada
+            DrawRectangleRec((Rectangle){479.0f, 503.0f, 26.0f, 5.0f}, (Color){28, 30, 32, 235});
+            for (float x = 480.0f; x < 505.0f; x += 4.0f) {
+                DrawRectangleRec((Rectangle){x, 502.0f, 1.0f, 7.0f}, (Color){96, 102, 106, 255});
+            }
+        }
+
         // quem esta mais abaixo na tela fica na frente
         const bool inimigoAtras = partida.inimigo.posicao.y <= partida.jogador.y;
         if (inimigoAtras) DesenharInimigo(&partida.inimigo);
@@ -474,8 +535,18 @@ int main(void){
         DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
         DesenharCargaLanterna(&partida.lanterna, larguraTela);
         DesenharVidas(partida.vidas, VIDAS_INICIAIS, larguraTela);
+
+        if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
+            Vector2DistanceSqr(partida.jogador, kCentroPorta) <= RAIO_PORTA * RAIO_PORTA) {
+            const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
+            const char *aviso = faltam == 1 ? "Falta 1 chave" : TextFormat("Faltam %d chaves", faltam);
+            DrawText(aviso, (larguraTela - MeasureText(aviso, 24)) / 2, alturaTela - 70, 24,
+                     (Color){214, 204, 190, 255});
+        }
+
         if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
         if (estado == ESTADO_FIM) DesenharTelaFim(larguraTela, alturaTela);
+        if (estado == ESTADO_VITORIA) DesenharTelaVitoria(larguraTela, alturaTela);
 
         EndDrawing();
     }
