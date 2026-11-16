@@ -25,7 +25,7 @@ bool RemoverItemHotbar(loot *slot);
 void EsvaziarHotbar(loot *primeiro);
 int ContarItemHotbar(loot *primeiro, ItemHotbar item);
 void RemoverTodosDoItemHotbar(loot *primeiro, ItemHotbar item);
-void DesenharChave(Vector2 centro, float tamanho);
+void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bateria);
 void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria);
 
 #endif

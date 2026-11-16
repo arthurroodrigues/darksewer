@@ -18,16 +18,11 @@
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 7.5f
 #define INTENSIDADE_ESCURO 0.99f
-#define TAMANHO_BATERIA_MAPA 15.0f
-#define RAIO_COLETA_BATERIA 12.5f
-#define DISTANCIA_MINIMA_SPAWN_BATERIA 24.0f
-#define DISTANCIA_MINIMA_ENTRE_BATERIAS 32.0f
-#define QUANTIDADE_BATERIAS 3
+#define TAMANHO_ITEM_MAPA 13.0f
+#define RAIO_COLETA_ITEM 12.5f
 #define QUANTIDADE_CHAVES 3
-#define TAMANHO_CHAVE_MAPA 12.0f
-#define RAIO_COLETA_CHAVE 12.5f
-#define DISTANCIA_MINIMA_SPAWN_CHAVE 150.0f
-#define DISTANCIA_MINIMA_ENTRE_CHAVES 150.0f
+#define QUANTIDADE_BATERIAS 3
+#define QUANTIDADE_ITENS_MAPA (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS)
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 9.0f
 #define VELOCIDADE_JOGADOR 112.0f
@@ -49,6 +44,23 @@
 static const Rectangle kZonaPorta = {478.0f, 502.0f, 28.0f, 8.0f};
 static const Vector2 kCentroPorta = {492.0f, 506.0f};
 static const Vector2 kBueiro = {491.0f, 585.0f};
+
+typedef struct {
+    Vector2 posicao;
+    ItemHotbar item;
+    bool coletado;
+} ItemNoMapa;
+
+// o que nasce no mapa a cada partida: quantos, a que distancia do jogador e entre si
+static const struct {
+    ItemHotbar item;
+    int quantidade;
+    float distanciaDoJogador;
+    float distanciaEntreItens;
+} kItensSorteados[] = {
+    {ITEM_CHAVE, QUANTIDADE_CHAVES, 150.0f, 150.0f},
+    {ITEM_BATERIA, QUANTIDADE_BATERIAS, 24.0f, 32.0f},
+};
 
 static const char *kShaderLanterna =
     "#version 330\n"
@@ -76,10 +88,7 @@ typedef enum {
 
 typedef struct {
     Vector2 jogador;
-    Vector2 posicoesBateria[QUANTIDADE_BATERIAS];
-    bool bateriasColetadas[QUANTIDADE_BATERIAS];
-    Vector2 posicoesChave[QUANTIDADE_CHAVES];
-    bool chavesColetadas[QUANTIDADE_CHAVES];
+    ItemNoMapa itens[QUANTIDADE_ITENS_MAPA];
     bool portaAberta;
     bool escapou;
     Lanterna lanterna;
@@ -102,17 +111,17 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
     EsvaziarHotbar(primeiroSlot);
     DefinirZonaBloqueada(kZonaPorta);
 
-    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-        if (!EncontrarPosicaoAcessivelAleatoria(
-                partida->jogador, DISTANCIA_MINIMA_SPAWN_BATERIA,
-                partida->posicoesBateria, i, DISTANCIA_MINIMA_ENTRE_BATERIAS,
-                &partida->posicoesBateria[i])) return false;
-    }
-    for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
-        if (!EncontrarPosicaoAcessivelAleatoria(
-                partida->jogador, DISTANCIA_MINIMA_SPAWN_CHAVE,
-                partida->posicoesChave, i, DISTANCIA_MINIMA_ENTRE_CHAVES,
-                &partida->posicoesChave[i])) return false;
+    Vector2 posicoesOcupadas[QUANTIDADE_ITENS_MAPA];
+    int total = 0;
+    for (size_t tipo = 0; tipo < sizeof(kItensSorteados) / sizeof(kItensSorteados[0]); tipo++) {
+        for (int i = 0; i < kItensSorteados[tipo].quantidade && total < QUANTIDADE_ITENS_MAPA; i++) {
+            if (!EncontrarPosicaoAcessivelAleatoria(
+                    partida->jogador, kItensSorteados[tipo].distanciaDoJogador,
+                    posicoesOcupadas, total, kItensSorteados[tipo].distanciaEntreItens,
+                    &posicoesOcupadas[total])) return false;
+            partida->itens[total] = (ItemNoMapa){posicoesOcupadas[total], kItensSorteados[tipo].item, false};
+            total++;
+        }
     }
     return PosicionarInimigo(&partida->inimigo, partida->jogador);
 }
@@ -147,22 +156,12 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 
     const bool jogadorEstaSeMovendo = Vector2DistanceSqr(partida->jogador, posicaoAnteriorJogador) > 0.0001f;
 
-    for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-        if (!partida->bateriasColetadas[i] &&
-            Vector2DistanceSqr(partida->jogador, partida->posicoesBateria[i]) <=
-                RAIO_COLETA_BATERIA * RAIO_COLETA_BATERIA) {
-            partida->bateriasColetadas[i] =
-                AdicionarItemHotbar(primeiroSlot, ITEM_BATERIA);
-            if (partida->bateriasColetadas[i]) TocarSomColeta(sons);
-        }
-    }
-
-    for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
-        if (!partida->chavesColetadas[i] &&
-            Vector2DistanceSqr(partida->jogador, partida->posicoesChave[i]) <=
-                RAIO_COLETA_CHAVE * RAIO_COLETA_CHAVE) {
-            partida->chavesColetadas[i] = AdicionarItemHotbar(primeiroSlot, ITEM_CHAVE);
-            if (partida->chavesColetadas[i]) TocarSomColeta(sons);
+    for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+        ItemNoMapa *item = &partida->itens[i];
+        if (!item->coletado &&
+            Vector2DistanceSqr(partida->jogador, item->posicao) <= RAIO_COLETA_ITEM * RAIO_COLETA_ITEM) {
+            item->coletado = AdicionarItemHotbar(primeiroSlot, item->item);
+            if (item->coletado) TocarSomColeta(sons);
         }
     }
 
@@ -550,25 +549,9 @@ int main(void){
         const Rectangle origemMapa = {0.0f, 0.0f, (float)mapa.width, (float)mapa.height};
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
-        for (int i = 0; i < QUANTIDADE_BATERIAS; i++) {
-            if (partida.bateriasColetadas[i]) continue;
-            const float larguraBateria = TAMANHO_BATERIA_MAPA *
-                (float)bateria.width / (float)bateria.height;
-            const Rectangle origemBateria = {
-                0.0f, 0.0f, (float)bateria.width, (float)bateria.height
-            };
-            const Rectangle destinoBateria = {
-                partida.posicoesBateria[i].x - larguraBateria * 0.5f,
-                partida.posicoesBateria[i].y - TAMANHO_BATERIA_MAPA * 0.5f,
-                larguraBateria,
-                TAMANHO_BATERIA_MAPA
-            };
-            DrawTexturePro(bateria, origemBateria, destinoBateria,
-                           (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
-        }
-
-        for (int i = 0; i < QUANTIDADE_CHAVES; i++) {
-            if (!partida.chavesColetadas[i]) DesenharChave(partida.posicoesChave[i], TAMANHO_CHAVE_MAPA);
+        for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+            const ItemNoMapa *item = &partida.itens[i];
+            if (!item->coletado) DesenharItem(item->item, item->posicao, TAMANHO_ITEM_MAPA, bateria);
         }
 
         if (!partida.portaAberta) {
