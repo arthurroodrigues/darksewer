@@ -341,9 +341,9 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     }
 
     const bool jogadorInvisivel = partida->escondido || partida->protecaoSaida > 0.0f;
-    if (!jogadorInvisivel) {
-        AtualizarInimigo(&partida->inimigo, partida->jogador,
-                         LanternaAcesa(&partida->lanterna), deltaTempo);
+    if (!jogadorInvisivel) {AtualizarInimigo(&partida->inimigo, partida->jogador, lanternaAcesa,
+                 partida->jogadorEscondido, deltaTempo);
+
     }
     if (!jogadorInvisivel && InimigoPegouJogador(&partida->inimigo, partida->jogador)) {
         partida->pego = true;
