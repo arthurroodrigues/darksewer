@@ -175,7 +175,6 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
             total++;
         }
     }
-
     Vector2 posicoesEsconderijos[QUANTIDADE_ITENS_MAPA + QUANTIDADE_ESCONDERIJOS];
     for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) posicoesEsconderijos[i] = partida->itens[i].posicao;
     int totalOcupadas = QUANTIDADE_ITENS_MAPA;
@@ -342,10 +341,13 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     }
 
     const bool jogadorInvisivel = partida->escondido || partida->protecaoSaida > 0.0f;
-    AtualizarInimigo(&partida->inimigo, partida->jogador,
-                     LanternaAcesa(&partida->lanterna), jogadorInvisivel, deltaTempo);
-
-    if (!jogadorInvisivel && InimigoPegouJogador(&partida->inimigo, partida->jogador)) partida->pego = true;
+    if (!jogadorInvisivel) {
+        AtualizarInimigo(&partida->inimigo, partida->jogador,
+                         LanternaAcesa(&partida->lanterna), deltaTempo);
+    }
+    if (!jogadorInvisivel && InimigoPegouJogador(&partida->inimigo, partida->jogador)) {
+        partida->pego = true;
+    }
 
     AtualizarPassos(sons, jogadorEstaSeMovendo);
 }
@@ -605,7 +607,7 @@ int main(void){
         SetTextureFilter(texturaEscape, TEXTURE_FILTER_BILINEAR);
     }
 
-    int codigoSaida = (CarregarSpritesInimigo() && CarregarTexturasEsconderijo()) ? 0 : 1;
+    int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
 
     char caminhoRanking[512];
     snprintf(caminhoRanking, sizeof(caminhoRanking), "%s%s", GetApplicationDirectory(), ARQUIVO_RANKING);
