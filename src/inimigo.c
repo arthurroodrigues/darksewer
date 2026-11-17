@@ -5,8 +5,8 @@
 #include <math.h>
 #include <stddef.h>
 
-#define VELOCIDADE_PATRULHA 45.0f
-#define VELOCIDADE_PERSEGUICAO 100.0f
+#define VELOCIDADE_PATRULHA 34.0f
+#define VELOCIDADE_PERSEGUICAO 60.0f
 #define ALCANCE_VISAO_LANTERNA_ACESA 110.0f
 #define ALCANCE_VISAO_ESCURO 35.0f
 #define RAIO_CAPTURA 8.0f
@@ -15,17 +15,15 @@
 #define DISTANCIA_MINIMA_NASCIMENTO 250.0f
 #define DISTANCIA_MINIMA_PATRULHA 80.0f
 #define INTERVALO_ANIMACAO_INIMIGO 0.18f
-#define ALTURA_SPRITE_INIMIGO 24.0f
-#define QUANTIDADE_SPRITES_INIMIGO 6
+#define ALTURA_SPRITE_INIMIGO 20.0f
+#define QUANTIDADE_SPRITES_INIMIGO 4
 
-// ordem: de lado, de frente e de costas; em cada par, parado e andando
+// As imagens novas têm uma pose por direção. A mesma pose é usada parado e andando.
 static const char *const kArquivosSprites[QUANTIDADE_SPRITES_INIMIGO] = {
-    "assets/inimigo_parado.png",
-    "assets/inimigo_andando.png",
-    "assets/inimigo_parado_para_frente.png",
-    "assets/inimigo_andando_para_frente.png",
-    "assets/inimigo_parado_para_tras.png",
-    "assets/inimigo_andando_para_tras.png"
+    "assets/inimigo_sprite_direita.png",
+    "assets/inimigo_sprite_esquerda.png",
+    "assets/inimigo_sprite_frente.png",
+    "assets/inimigo_sprite_tras.png"
 };
 static Texture2D sprites[QUANTIDADE_SPRITES_INIMIGO];
 
@@ -37,7 +35,7 @@ bool CarregarSpritesInimigo(void){
             LiberarSpritesInimigo();
             return false;
         }
-        SetTextureFilter(sprites[i], TEXTURE_FILTER_POINT);
+        SetTextureFilter(sprites[i], TEXTURE_FILTER_BILINEAR);
     }
     return true;
 }
@@ -50,11 +48,10 @@ void LiberarSpritesInimigo(void){
 }
 
 void DesenharInimigo(const Inimigo *inimigo){
-    const int direcao = !inimigo->olhandoVertical ? 0 : (inimigo->olhandoParaFrente ? 2 : 4);
-    const Texture2D sprite = sprites[direcao + (inimigo->quadroAnimacaoAndando ? 1 : 0)];
-    // os sprites de lado olham para a direita; para a esquerda, espelha
-    const bool espelhado = !inimigo->olhandoVertical && inimigo->olhandoEsquerda;
-    DesenharPersonagem(inimigo->posicao, sprite, ALTURA_SPRITE_INIMIGO, espelhado);
+    const int direcao = inimigo->olhandoVertical
+        ? (inimigo->olhandoParaFrente ? 2 : 3)
+        : (inimigo->olhandoEsquerda ? 1 : 0);
+    DesenharPersonagem(inimigo->posicao, sprites[direcao], ALTURA_SPRITE_INIMIGO, false);
 }
 
 static void EscolherAlvoPatrulha(Inimigo *inimigo){
@@ -90,8 +87,14 @@ static void Andar(Inimigo *inimigo, float distancia, float deltaTempo){
     const float intensidadeHorizontal = fabsf(movimento.x);
     const float intensidadeVertical = fabsf(movimento.y);
 
-    if (intensidadeVertical > intensidadeHorizontal ||
-        (intensidadeVertical == intensidadeHorizontal && inimigo->olhandoVertical)) {
+    bool olhandoVertical = inimigo->olhandoVertical;
+    if (olhandoVertical && intensidadeHorizontal > intensidadeVertical * 1.25f) {
+        olhandoVertical = false;
+    } else if (!olhandoVertical && intensidadeVertical > intensidadeHorizontal * 1.25f) {
+        olhandoVertical = true;
+    }
+
+    if (olhandoVertical) {
         inimigo->olhandoParaFrente = movimento.y > 0.0f;
         inimigo->olhandoVertical = true;
     } else {

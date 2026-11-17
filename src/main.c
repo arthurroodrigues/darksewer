@@ -17,7 +17,7 @@
 #define TELA_INICIAL_ARQUIVO "assets/tela_de_inicio.png"
 #define BATERIA_ARQUIVO "assets/bateria.png"
 #define INTERVALO_ANIMACAO 0.18f
-#define ZOOM_CAMERA 7.5f
+#define ZOOM_CAMERA 10.0f
 #define INTENSIDADE_ESCURO 0.99f
 #define TAMANHO_ITEM_MAPA 9.0f
 #define RAIO_COLETA_ITEM 10.0f
@@ -28,7 +28,7 @@
     (QUANTIDADE_CHAVES + QUANTIDADE_BATERIAS + QUANTIDADE_BUSSOLAS)
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 10.0f
-#define VELOCIDADE_JOGADOR 112.0f
+#define VELOCIDADE_JOGADOR 90.0f
 #define JOGADOR_INICIAL_X 100.0f
 #define JOGADOR_INICIAL_Y 590.0f
 #define ARQUIVO_SPRITE_PARADO "assets/jogador_parado.png"
