@@ -16,7 +16,7 @@ O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanter
 
 | Tecla | Ação |
 |-------|------|
-| Enter, Espaço ou clique em JOGAR | Começar a partida |
+| Enter, Espaço ou clique em JOGAR | Iniciar a introdução; Enter avança as falas e libera o movimento após a última |
 | R (na tela inicial) | Ver o ranking |
 | W A S D ou setas | Andar |
 | F | Ligar e desligar a lanterna |

@@ -1,6 +1,97 @@
 #include "menu.h"
 #include "ranking.h"
 #include <math.h>
+#include <string.h>
+
+static int DesenharTextoQuebrado(const char *texto, int x, int y, int larguraMaxima,
+                                 int tamanhoFonte, int espacamento, bool desenhar){
+    char linha[256] = "";
+    int linhas = 0;
+
+    while (*texto != '\0') {
+        while (*texto == ' ') texto++;
+        if (*texto == '\0') break;
+
+        const char *fimPalavra = strchr(texto, ' ');
+        const size_t tamanhoPalavra = fimPalavra != NULL
+            ? (size_t)(fimPalavra - texto) : strlen(texto);
+        if (tamanhoPalavra >= sizeof(linha)) break;
+
+        char palavra[sizeof(linha)];
+        memcpy(palavra, texto, tamanhoPalavra);
+        palavra[tamanhoPalavra] = '\0';
+
+        const size_t tamanhoLinha = strlen(linha);
+        const size_t tamanhoSeparador = tamanhoLinha > 0 ? 1 : 0;
+        const size_t tamanhoTentativa = tamanhoLinha + tamanhoSeparador + tamanhoPalavra;
+        if (tamanhoTentativa >= sizeof(linha)) {
+            if (linha[0] == '\0') break;
+            if (desenhar) {
+                DrawText(linha, x, y + linhas * espacamento, tamanhoFonte, (Color){214, 204, 190, 255});
+            }
+            linhas++;
+            memcpy(linha, palavra, tamanhoPalavra + 1);
+            texto += tamanhoPalavra;
+            continue;
+        }
+
+        char tentativa[sizeof(linha)];
+        memcpy(tentativa, linha, tamanhoLinha);
+        if (tamanhoSeparador > 0) tentativa[tamanhoLinha] = ' ';
+        memcpy(tentativa + tamanhoLinha + tamanhoSeparador, palavra, tamanhoPalavra + 1);
+
+        if (linha[0] != '\0' && MeasureText(tentativa, tamanhoFonte) > larguraMaxima) {
+            if (desenhar) {
+                DrawText(linha, x, y + linhas * espacamento, tamanhoFonte, (Color){214, 204, 190, 255});
+            }
+            linhas++;
+            memcpy(linha, palavra, tamanhoPalavra + 1);
+        } else {
+            memcpy(linha, tentativa, tamanhoTentativa + 1);
+        }
+        texto += tamanhoPalavra;
+    }
+
+    if (linha[0] != '\0') {
+        if (desenhar) {
+            DrawText(linha, x, y + linhas * espacamento, tamanhoFonte, (Color){214, 204, 190, 255});
+        }
+        linhas++;
+    }
+    return linhas;
+}
+
+void DesenharCaixaDialogo(const char *texto, const char *textoCompleto,
+                          bool ultimaFala, bool falaCompleta, int larguraTela, int alturaTela){
+    const int tamanhoFonte = 20;
+    const int espacamento = 26;
+    const float margem = 26.0f;
+    const float largura = fminf((float)larguraTela - margem * 2.0f, 740.0f);
+    const int larguraTexto = (int)largura - 58;
+    const int linhas = DesenharTextoQuebrado(textoCompleto, 0, 0, larguraTexto, tamanhoFonte, espacamento, false);
+    const float altura = 66.0f + (float)(linhas > 0 ? linhas : 1) * (float)espacamento;
+    const float x = margem;
+    const float y = (float)alturaTela - altura - margem;
+    const Rectangle painel = {x, y, largura, altura};
+
+    DrawRectangleRounded(painel, 0.08f, 10, (Color){91, 28, 27, 245});
+    DrawRectangleRounded((Rectangle){x + 2.0f, y + 2.0f, largura - 4.0f, altura - 4.0f},
+                         0.08f, 10, (Color){20, 18, 17, 248});
+    DrawRectangle((int)x + 16, (int)y + 16, 3, (int)altura - 32, (Color){137, 83, 49, 255});
+    DrawText("VOCÊ", (int)x + 30, (int)y + 11, 16, (Color){176, 128, 79, 255});
+    DesenharTextoQuebrado(texto, (int)x + 30, (int)y + 34, larguraTexto,
+                          tamanhoFonte, espacamento, true);
+
+    if (ultimaFala && falaCompleta) {
+        const char *instrucao = "ENTER - começar";
+        DrawText(instrucao, (int)(x + largura - 18.0f - MeasureText(instrucao, 14)),
+                 (int)(y + altura - 24.0f), 14, (Color){176, 128, 79, 255});
+    } else if (!ultimaFala) {
+        const char *instrucao = "ENTER - próxima fala";
+        DrawText(instrucao, (int)(x + largura - 18.0f - MeasureText(instrucao, 14)),
+                 (int)(y + altura - 24.0f), 14, (Color){176, 128, 79, 255});
+    }
+}
 
 Rectangle CalcularDestinoTelaInicial(Texture2D imagemFundo, int larguraTela, int alturaTela){
     const float escala = fmaxf((float)larguraTela / (float)imagemFundo.width, (float)alturaTela / (float)imagemFundo.height);

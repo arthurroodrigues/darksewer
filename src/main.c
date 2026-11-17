@@ -19,6 +19,10 @@
 #define JUMPSCARE_ANIMACAO_ARQUIVO "assets/jumpscare.gif"
 #define JUMPSCARE_AUDIO_ARQUIVO "assets/jumpscare.wav"
 #define JUMPSCARE_FPS 15.0f
+#define DURACAO_APAGAO 1.5f
+#define INTERVALO_PISCADA_LANTERNA 0.3f
+#define DURACAO_INTRODUCAO 1.8f
+#define INTERVALO_LETRA_FALA 0.035f
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 12.0f
 #define INTENSIDADE_ESCURO 0.99f
@@ -49,6 +53,11 @@
 static const Rectangle kZonaPorta = {250.0f, 242.0f, 70.0f, 8.0f};
 static const Vector2 kCentroPorta = {285.0f, 246.0f};
 static const Vector2 kBueiro = {287.0f, 310.0f};
+static const char *const kFalasIntroducao[] = {
+    ": Caramba, eu to preso aqui!",
+    "preciso fugir antes que esse palhaço me encontre",
+    "Droga, a lanterna tá descarregando. preciso achar uma bateria rápido!"
+};
 
 typedef struct {
     Vector2 posicao;
@@ -84,8 +93,11 @@ static const char *kShaderLanterna =
 
 typedef enum {
     ESTADO_MENU,
+    ESTADO_INTRODUCAO,
+    ESTADO_DIALOGO,
     ESTADO_JOGANDO,
     ESTADO_PAUSADO,
+    ESTADO_APAGAO,
     ESTADO_JUMPSCARE,
     ESTADO_FIM,
     ESTADO_VITORIA,
@@ -147,6 +159,37 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
         }
     }
     return PosicionarInimigo(&partida->inimigo, partida->jogador);
+}
+
+static int ContarCaracteresUTF8(const char *texto){
+    int quantidade = 0;
+    for (const unsigned char *byte = (const unsigned char *)texto; *byte != '\0'; byte++) {
+        if ((*byte & 0xC0) != 0x80) quantidade++;
+    }
+    return quantidade;
+}
+
+static void CopiarPrefixoUTF8(char *destino, size_t tamanhoDestino,
+                              const char *texto, int quantidadeCaracteres){
+    size_t bytes = 0;
+    int caracteres = 0;
+    while (texto[bytes] != '\0' && caracteres < quantidadeCaracteres) {
+        const unsigned char primeiroByte = (unsigned char)texto[bytes];
+        const size_t tamanhoCaractere = primeiroByte < 0x80 ? 1 :
+                                        primeiroByte < 0xE0 ? 2 :
+                                        primeiroByte < 0xF0 ? 3 : 4;
+        bytes += tamanhoCaractere;
+        caracteres++;
+    }
+    if (bytes >= tamanhoDestino) bytes = tamanhoDestino - 1;
+    for (size_t i = 0; i < bytes; i++) destino[i] = texto[i];
+    destino[bytes] = '\0';
+}
+
+static void IniciarIntroducao(float *tempoIntroducao, int *indiceFala, float *tempoFala){
+    *tempoIntroducao = 0.0f;
+    *indiceFala = 0;
+    *tempoFala = 0.0f;
 }
 
 static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, float deltaTempo){
@@ -451,6 +494,10 @@ int main(void){
 
     EstadoJogo estado = ESTADO_MENU;
     float opacidadeTelaInicial = 0.0f;
+    float tempoIntroducao = 0.0f;
+    int indiceFala = 0;
+    float tempoFala = 0.0f;
+    float tempoApagao = 0.0f;
     float tempoJumpscare = 0.0f;
     int quadroJumpscareAtual = -1;
 
@@ -506,7 +553,8 @@ int main(void){
                     codigoSaida = 1;
                     break;
                 }
-                estado = ESTADO_JOGANDO;
+                IniciarIntroducao(&tempoIntroducao, &indiceFala, &tempoFala);
+                estado = ESTADO_INTRODUCAO;
                 if (audioDisponivel) StopMusicStream(sonsJogo.musicaFundo);
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
@@ -517,7 +565,7 @@ int main(void){
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
 
-            if (audioDisponivel && estado != ESTADO_JOGANDO) UpdateMusicStream(sonsJogo.musicaFundo);
+            if (audioDisponivel && estado == ESTADO_MENU) UpdateMusicStream(sonsJogo.musicaFundo);
 
             BeginDrawing();
             DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
@@ -531,19 +579,42 @@ int main(void){
                     codigoSaida = 1;
                     break;
                 }
-                estado = ESTADO_JOGANDO;
+                IniciarIntroducao(&tempoIntroducao, &indiceFala, &tempoFala);
+                estado = ESTADO_INTRODUCAO;
                 if (audioDisponivel) StopMusicStream(sonsJogo.musicaFundo);
             } else if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_ESCAPE)) {
                 estado = ESTADO_MENU;
             }
 
-            if (audioDisponivel && estado != ESTADO_JOGANDO) UpdateMusicStream(sonsJogo.musicaFundo);
+            if (audioDisponivel && estado == ESTADO_RANKING) UpdateMusicStream(sonsJogo.musicaFundo);
 
             BeginDrawing();
             DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
             DesenharRanking(ranking, registroNovo, larguraTela, alturaTela);
             EndDrawing();
             continue;
+        }
+
+        if (estado == ESTADO_INTRODUCAO) {
+            tempoIntroducao += deltaTempo;
+            if (tempoIntroducao >= DURACAO_INTRODUCAO) {
+                estado = ESTADO_DIALOGO;
+                tempoFala = 0.0f;
+            }
+        } else if (estado == ESTADO_DIALOGO) {
+            const char *fala = kFalasIntroducao[indiceFala];
+            const float duracaoFala = ContarCaracteresUTF8(fala) * INTERVALO_LETRA_FALA;
+            if (IsKeyPressed(KEY_ENTER)) {
+                if (indiceFala < (int)(sizeof(kFalasIntroducao) / sizeof(kFalasIntroducao[0])) - 1) {
+                    indiceFala++;
+                    tempoFala = 0.0f;
+                } else if (tempoFala >= duracaoFala) {
+                    estado = ESTADO_JOGANDO;
+                } else {
+                    tempoFala = duracaoFala;
+                }
+            }
+            if (estado == ESTADO_DIALOGO) tempoFala = fminf(tempoFala + deltaTempo, duracaoFala);
         }
 
         if ((estado == ESTADO_JOGANDO || estado == ESTADO_PAUSADO) &&
@@ -563,7 +634,12 @@ int main(void){
                 nomeJogador[0] = '\0';
                 tamanhoNome = 0;
                 digitacaoLiberada = false;
+            } else if (partida.lanterna.carga <= 0.0f) {
+                estado = ESTADO_APAGAO;
+                tempoApagao = 0.0f;
             }
+        } else if (estado == ESTADO_APAGAO) {
+            AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
         } else {
             AtualizarPassos(&sonsJogo, false);
             if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
@@ -604,15 +680,27 @@ int main(void){
                     codigoSaida = 1;
                     break;
                 }
-                estado = ESTADO_JOGANDO;
+                IniciarIntroducao(&tempoIntroducao, &indiceFala, &tempoFala);
+                estado = ESTADO_INTRODUCAO;
             }
-            if (estado != ESTADO_VITORIA && estado != ESTADO_JUMPSCARE && IsKeyPressed(KEY_M)) {
+            if (estado != ESTADO_VITORIA && estado != ESTADO_APAGAO &&
+                estado != ESTADO_JUMPSCARE && IsKeyPressed(KEY_M)) {
                 estado = ESTADO_MENU;
                 if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
                 BeginDrawing();
                 DesenharTelaInicial(telaInicial, larguraTela, alturaTela, opacidadeTelaInicial);
                 EndDrawing();
                 continue;
+            }
+        }
+
+        if (estado == ESTADO_APAGAO) {
+            tempoApagao += deltaTempo;
+            if (tempoApagao >= DURACAO_APAGAO) {
+                estado = ESTADO_JUMPSCARE;
+                tempoJumpscare = 0.0f;
+                quadroJumpscareAtual = -1;
+                if (IsSoundValid(somJumpscare)) PlaySound(somJumpscare);
             }
         }
 
@@ -663,13 +751,18 @@ int main(void){
         camera.target.x = fmaxf(metadeLarguraVisivel, fminf(partida.jogador.x, MAPA_LARGURA - metadeLarguraVisivel));
         camera.target.y = fmaxf(metadeAlturaVisivel, fminf(partida.jogador.y, MAPA_ALTURA - metadeAlturaVisivel));
 
-        const Vector2 posicaoJogadorNaTela = GetWorldToScreen2D(partida.jogador, camera);
+        const Vector2 centroJogadorNoMundo = {partida.jogador.x, partida.jogador.y - 9.0f};
+        const Vector2 posicaoJogadorNaTela = GetWorldToScreen2D(centroJogadorNoMundo, camera);
         const Vector2 posicaoLuzShader = {
             posicaoJogadorNaTela.x,
             (float)alturaTela - posicaoJogadorNaTela.y
         };
 
-        const float raioLuzShader = RaioLanterna(&partida.lanterna) * camera.zoom;
+        const Lanterna lanternaPiscando = {.carga = 0.0f, .ligada = true};
+        const float raioLuzShader =
+            (estado == ESTADO_APAGAO
+                ? RaioLanterna(&lanternaPiscando)
+                : RaioLanterna(&partida.lanterna)) * camera.zoom;
 
         SetShaderValue(shaderLanterna, localLuzShader, &posicaoLuzShader, SHADER_UNIFORM_VEC2);
         SetShaderValue(shaderLanterna, localRaioShader, &raioLuzShader, SHADER_UNIFORM_FLOAT);
@@ -728,9 +821,26 @@ int main(void){
             DrawRectangle(0, 0, larguraTela, alturaTela, WHITE);
         EndShaderMode();
 
+        if (estado == ESTADO_APAGAO &&
+            fmodf(tempoApagao, INTERVALO_PISCADA_LANTERNA) >= INTERVALO_PISCADA_LANTERNA * 0.5f) {
+            DrawRectangle(0, 0, larguraTela, alturaTela, BLACK);
+        } else if (estado == ESTADO_INTRODUCAO) {
+            const float progresso = fminf(tempoIntroducao / DURACAO_INTRODUCAO, 1.0f);
+            DrawRectangle(0, 0, larguraTela, alturaTela,
+                          (Color){0, 0, 0, (unsigned char)(255.0f * (1.0f - progresso))});
+        } else if (estado == ESTADO_DIALOGO) {
+            const char *fala = kFalasIntroducao[indiceFala];
+            char falaVisivel[256];
+            const int caracteresVisiveis = (int)(tempoFala / INTERVALO_LETRA_FALA);
+            CopiarPrefixoUTF8(falaVisivel, sizeof(falaVisivel), fala, caracteresVisiveis);
+            const bool ultimaFala = indiceFala == (int)(sizeof(kFalasIntroducao) / sizeof(kFalasIntroducao[0])) - 1;
+            const bool falaCompleta = tempoFala >= ContarCaracteresUTF8(fala) * INTERVALO_LETRA_FALA;
+            DesenharCaixaDialogo(falaVisivel, fala, ultimaFala, falaCompleta,
+                                 larguraTela, alturaTela);
+        }
+
         if (estado == ESTADO_JOGANDO && partida.slotSelecionado->item == ITEM_BUSSOLA) {
-            const Vector2 centro = GetWorldToScreen2D(
-                (Vector2){partida.jogador.x, partida.jogador.y - 9.0f}, camera);
+            const Vector2 centro = GetWorldToScreen2D(centroJogadorNoMundo, camera);
             const Vector2 alvo = GetWorldToScreen2D(AlvoDaBussola(&partida), camera);
             const Vector2 direcao = Vector2Normalize(Vector2Subtract(alvo, centro));
             const Vector2 lateral = {-direcao.y, direcao.x};
@@ -740,27 +850,30 @@ int main(void){
                          Vector2Add(base, Vector2Scale(lateral, 11.0f)), (Color){212, 175, 55, 255});
         }
 
-        DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
-        DesenharCargaLanterna(&partida.lanterna, larguraTela);
+        if (estado != ESTADO_INTRODUCAO && estado != ESTADO_DIALOGO &&
+            estado != ESTADO_APAGAO) {
+            DesenharHotbar(primeiroSlot, partida.slotSelecionado, bateria);
+            DesenharCargaLanterna(&partida.lanterna, larguraTela);
 
-        const char *relogio = FormatarTempo(partida.tempoPartida);
-        DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
+            const char *relogio = FormatarTempo(partida.tempoPartida);
+            DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
 
-        const int chavesNaMao = ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
-        const char *objetivo = partida.portaAberta
-            ? "Escape pelo poço"
-            : (chavesNaMao >= QUANTIDADE_CHAVES
-                ? "Leve as chaves até a grade do poço, na sala central"
-                : TextFormat("Encontre as chaves: %d/%d", chavesNaMao, QUANTIDADE_CHAVES));
-        DrawText(objetivo, (larguraTela - MeasureText(objetivo, 20)) / 2, alturaTela - 36, 20,
-                 (Color){150, 112, 72, 255});
+            const int chavesNaMao = ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
+            const char *objetivo = partida.portaAberta
+                ? "Escape pelo poço"
+                : (chavesNaMao >= QUANTIDADE_CHAVES
+                    ? "Leve as chaves até a grade do poço, na sala central"
+                    : TextFormat("Encontre as chaves: %d/%d", chavesNaMao, QUANTIDADE_CHAVES));
+            DrawText(objetivo, (larguraTela - MeasureText(objetivo, 20)) / 2, alturaTela - 36, 20,
+                     (Color){150, 112, 72, 255});
 
-        if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
-            CheckCollisionCircleRec(partida.jogador, RAIO_PORTA, kZonaPorta)) {
-            const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
-            const char *aviso = faltam == 1 ? "Falta 1 chave" : TextFormat("Faltam %d chaves", faltam);
-            DrawText(aviso, (larguraTela - MeasureText(aviso, 24)) / 2, alturaTela - 70, 24,
-                     (Color){214, 204, 190, 255});
+            if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
+                CheckCollisionCircleRec(partida.jogador, RAIO_PORTA, kZonaPorta)) {
+                const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
+                const char *aviso = faltam == 1 ? "Falta 1 chave" : TextFormat("Faltam %d chaves", faltam);
+                DrawText(aviso, (larguraTela - MeasureText(aviso, 24)) / 2, alturaTela - 70, 24,
+                         (Color){214, 204, 190, 255});
+            }
         }
 
         if (estado == ESTADO_PAUSADO) DesenharTelaPausa(larguraTela, alturaTela);
