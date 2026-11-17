@@ -16,10 +16,13 @@
 #define MAPA_ARQUIVO "assets/mapa.png"
 #define TELA_INICIAL_ARQUIVO "assets/tela_de_inicio.png"
 #define BATERIA_ARQUIVO "assets/bateria.png"
+#define IMAGEM_ESCAPE_ARQUIVO "assets/imagem_escapou.png"
 #define JUMPSCARE_ANIMACAO_ARQUIVO "assets/jumpscare.gif"
 #define JUMPSCARE_AUDIO_ARQUIVO "assets/jumpscare.wav"
 #define JUMPSCARE_FPS 15.0f
 #define DURACAO_APAGAO 1.5f
+#define DURACAO_FADE_ESCAPE 1.5f
+#define DURACAO_EXIBICAO_ESCAPE 4.0f
 #define INTERVALO_PISCADA_LANTERNA 0.3f
 #define DURACAO_INTRODUCAO 1.8f
 #define INTERVALO_LETRA_FALA 0.035f
@@ -99,6 +102,7 @@ typedef enum {
     ESTADO_PAUSADO,
     ESTADO_APAGAO,
     ESTADO_JUMPSCARE,
+    ESTADO_TELA_ESCAPE,
     ESTADO_FIM,
     ESTADO_VITORIA,
     ESTADO_RANKING
@@ -525,6 +529,13 @@ int main(void){
         return 1;
     }
     Partida partida = {0};
+    Texture2D texturaEscape = LoadTexture(IMAGEM_ESCAPE_ARQUIVO);
+    if (texturaEscape.id == 0) {
+        TraceLog(LOG_WARNING, "Nao foi possivel carregar a imagem da fuga: %s", IMAGEM_ESCAPE_ARQUIVO);
+    } else {
+        SetTextureFilter(texturaEscape, TEXTURE_FILTER_BILINEAR);
+    }
+
     int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
 
     char caminhoRanking[512];
@@ -534,6 +545,7 @@ int main(void){
     char nomeJogador[TAMANHO_NOME_RANKING + 1] = "";
     int tamanhoNome = 0;
     bool digitacaoLiberada = false;
+    float tempoTelaEscape = 0.0f;
 
     while (codigoSaida == 0 && !WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
@@ -630,10 +642,8 @@ int main(void){
                 quadroJumpscareAtual = -1;
                 if (IsSoundValid(somJumpscare)) PlaySound(somJumpscare);
             } else if (partida.escapou) {
-                estado = ESTADO_VITORIA;
-                nomeJogador[0] = '\0';
-                tamanhoNome = 0;
-                digitacaoLiberada = false;
+                estado = ESTADO_TELA_ESCAPE;
+                tempoTelaEscape = 0.0f;
             } else if (partida.lanterna.carga <= 0.0f) {
                 estado = ESTADO_APAGAO;
                 tempoApagao = 0.0f;
@@ -740,6 +750,39 @@ int main(void){
                 if (IsSoundValid(somJumpscare) && IsSoundPlaying(somJumpscare)) {
                     StopSound(somJumpscare);
                 }
+            }
+            continue;
+        }
+
+        if (estado == ESTADO_TELA_ESCAPE) {
+            tempoTelaEscape += deltaTempo;
+            const float opacidade = fminf(tempoTelaEscape / DURACAO_FADE_ESCAPE, 1.0f);
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+            if (texturaEscape.id != 0) {
+                const float escala = fminf((float)larguraTela / texturaEscape.width,
+                                           (float)alturaTela / texturaEscape.height);
+                const float larguraImagem = (float)texturaEscape.width * escala;
+                const float alturaImagem = (float)texturaEscape.height * escala;
+                const Rectangle origem = {
+                    0.0f, 0.0f, (float)texturaEscape.width, (float)texturaEscape.height
+                };
+                const Rectangle destino = {
+                    (larguraTela - larguraImagem) * 0.5f,
+                    (alturaTela - alturaImagem) * 0.5f,
+                    larguraImagem, alturaImagem
+                };
+                DrawTexturePro(texturaEscape, origem, destino, (Vector2){0.0f, 0.0f}, 0.0f,
+                               (Color){255, 255, 255, (unsigned char)(255.0f * opacidade)});
+            }
+            EndDrawing();
+
+            if (tempoTelaEscape >= DURACAO_FADE_ESCAPE + DURACAO_EXIBICAO_ESCAPE) {
+                estado = ESTADO_VITORIA;
+                nomeJogador[0] = '\0';
+                tamanhoNome = 0;
+                digitacaoLiberada = false;
             }
             continue;
         }
@@ -888,6 +931,7 @@ int main(void){
     LiberarRanking(ranking);
     LiberarSpritesInimigo();
     LiberarHotbar(primeiroSlot);
+    if (texturaEscape.id != 0) UnloadTexture(texturaEscape);
     UnloadShader(shaderLanterna);
     if (IsSoundValid(somJumpscare)) UnloadSound(somJumpscare);
     LiberarSons(&sonsJogo);
