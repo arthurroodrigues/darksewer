@@ -19,6 +19,7 @@ typedef struct {
     bool olhandoParaFrente;
     bool olhandoVertical;
     bool quadroAnimacaoAndando;
+    bool jogadorEstavaEscondido;
 } Inimigo;
 
 bool CarregarSpritesInimigo(void);

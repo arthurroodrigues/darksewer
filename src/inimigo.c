@@ -139,12 +139,13 @@ void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAce
         LinhaLivre(inimigo->posicao, posicaoJogador);
 
     if (jogadorEscondido) {
-        /* Perdeu o jogador de vista: nunca vai "procurar" no ultimo ponto visto (o esconderijo)
-           e sempre escolhe patrulhas longe dele, para nao ficar acampado na porta. */
-        if (inimigo->estado != INIMIGO_PATRULHANDO || ChegouAoAlvoDoMapa(inimigo->posicao)) {
+        /* Ao entrar no esconderijo, escolhe uma rota para longe e não fica acampado por perto. */
+        if (!inimigo->jogadorEstavaEscondido || ChegouAoAlvoDoMapa(inimigo->posicao)) {
             AfastarDoEsconderijo(inimigo, posicaoJogador);
         }
+        inimigo->jogadorEstavaEscondido = true;
     } else if (vendoJogador) {
+        inimigo->jogadorEstavaEscondido = false;
         inimigo->tempoRecalculo -= deltaTempo;
         if (inimigo->estado != INIMIGO_PERSEGUINDO || inimigo->tempoRecalculo <= 0.0f) {
             AtualizarMapaDistancias(posicaoJogador);
@@ -152,14 +153,18 @@ void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAce
         }
         inimigo->estado = INIMIGO_PERSEGUINDO;
     } else if (inimigo->estado == INIMIGO_PERSEGUINDO) {
+        inimigo->jogadorEstavaEscondido = false;
         inimigo->estado = INIMIGO_PROCURANDO;
         inimigo->tempoProcurando = 0.0f;
-    } else if (ChegouAoAlvoDoMapa(inimigo->posicao)) {
-        if (inimigo->estado == INIMIGO_PATRULHANDO) {
-            EscolherAlvoPatrulha(inimigo);
-        } else {
-            inimigo->tempoProcurando += deltaTempo;
-            if (inimigo->tempoProcurando >= TEMPO_PROCURANDO) EscolherAlvoPatrulha(inimigo);
+    } else {
+        inimigo->jogadorEstavaEscondido = false;
+        if (ChegouAoAlvoDoMapa(inimigo->posicao)) {
+            if (inimigo->estado == INIMIGO_PATRULHANDO) {
+                EscolherAlvoPatrulha(inimigo);
+            } else {
+                inimigo->tempoProcurando += deltaTempo;
+                if (inimigo->tempoProcurando >= TEMPO_PROCURANDO) EscolherAlvoPatrulha(inimigo);
+            }
         }
     }
 

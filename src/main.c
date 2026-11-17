@@ -341,13 +341,9 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     }
 
     const bool jogadorInvisivel = partida->escondido || partida->protecaoSaida > 0.0f;
-    if (!jogadorInvisivel) {
-        AtualizarInimigo(&partida->inimigo, partida->jogador, LanternaAcesa(&partida->lanterna),
-                         jogadorInvisivel, deltaTempo);
-    }
+    AtualizarInimigo(&partida->inimigo, partida->jogador, LanternaAcesa(&partida->lanterna),
+                     partida->escondido, deltaTempo);
 
-
-    }
     if (!jogadorInvisivel && InimigoPegouJogador(&partida->inimigo, partida->jogador)) {
         partida->pego = true;
     }
@@ -426,9 +422,9 @@ int main(void){
         !FileExists(ARQUIVO_SPRITE_ANDANDO_ESQUERDA) ||
         !FileExists(ARQUIVO_SPRITE_FRENTE) || !FileExists(ARQUIVO_SPRITE_PARADO_FRENTE) ||
         !FileExists(ARQUIVO_SPRITE_TRAS) || !FileExists(ARQUIVO_SPRITE_PARADO_TRAS) ||
-        !FileExists(BATERIA_ARQUIVO) || !FileExists(JUMPSCARE_ANIMACAO_ARQUIVO) ||
-        !FileExists(JUMPSCARE_AUDIO_ARQUIVO)) {
-        TraceLog(LOG_ERROR, "Sprites, bateria ou arquivos do jumpscare ausentes.");
+        !FileExists(BATERIA_ARQUIVO) || !FileExists("assets/caixa.png") ||
+        !FileExists("assets/guarda_roupa.png") || !FileExists(JUMPSCARE_ANIMACAO_ARQUIVO)) {
+        TraceLog(LOG_ERROR, "Sprites, bateria, esconderijos ou animacao do jumpscare ausentes.");
         LiberarMascaraParedes();
         UnloadTexture(telaInicial);
         UnloadTexture(mapa);
@@ -610,7 +606,8 @@ int main(void){
         SetTextureFilter(texturaEscape, TEXTURE_FILTER_BILINEAR);
     }
 
-    int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
+    int codigoSaida = CarregarTexturasEsconderijo() ? 0 : 1;
+    if (codigoSaida == 0 && !CarregarSpritesInimigo()) codigoSaida = 1;
 
     char caminhoRanking[512];
     snprintf(caminhoRanking, sizeof(caminhoRanking), "%s%s", GetApplicationDirectory(), ARQUIVO_RANKING);
