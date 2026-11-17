@@ -10,7 +10,7 @@ Jogo de terror em C com [raylib](https://www.raylib.com/). Você está preso em 
 
 Se o palhaço encostar em você, a partida acaba.
 
-O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanterna serve para se esconder.
+O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanterna serve para se esconder. Você também pode se esconder dentro de **guarda-roupas** e **caixas** espalhados pelo esgoto (veja abaixo).
 
 ## Controles
 
@@ -20,6 +20,7 @@ O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanter
 | R (na tela inicial) | Ver o ranking |
 | W A S D ou setas | Andar |
 | F | Ligar e desligar a lanterna |
+| H ou clique direito | Entrar no esconderijo (perto de um guarda-roupa ou caixa) e sair dele |
 | Q e E, ou a roda do mouse | Trocar o item selecionado |
 | Espaço ou clique esquerdo | Usar o item selecionado |
 | ESC ou P | Pausar e continuar |
@@ -33,6 +34,17 @@ O palhaço enxerga mais longe quando a sua lanterna está acesa. Apagar a lanter
 | Bateria | Recarrega a lanterna. A carga cheia dura 90 segundos com a lanterna acesa. |
 | Chave | São três. Abrem a grade do poço. |
 | Bússola | Enquanto está selecionada, mostra uma seta para a chave mais próxima. Depois aponta para a grade e para o poço. |
+
+## Esconderijos
+
+Há **4 guarda-roupas** e **5 caixas** em posições sorteadas a cada partida. Chegue perto de um e aperte **H** (ou clique com o botão direito) para entrar.
+
+- Você fica escondido por no máximo **5 segundos**; aperte H de novo para sair antes, ou o jogo tira você sozinho.
+- Enquanto está escondido, o palhaço não vê nem pega você. Se ele estava na sua cola, ele desiste e segue patrulhando para longe do esconderijo, sem ficar parado na porta.
+- Depois de sair você tem **1,5 s** de proteção, e só pode usar outro esconderijo depois de **8 s**.
+- Escondido, você não anda, não coleta itens e não escapa pelo poço.
+
+Os valores ficam no topo de `src/main.c` (`DURACAO_MAXIMA_ESCONDIDO`, `RECARGA_ESCONDERIJO`, `PROTECAO_SAIDA_ESCONDERIJO`) e as quantidades em `include/esconderijo.h`.
 
 ## Ranking
 
@@ -79,7 +91,7 @@ make
 |------------------|----------|
 | `src/` | Código-fonte |
 | `include/` | Cabeçalhos |
-| `assets/` | Imagens do jogo, GIF e áudio do jumpscare |
+| `assets/` | Imagens do jogo (incluindo `caixa.png` e `guarda_roupa.png`), GIF e áudio do jumpscare |
 | `sons/` | Músicas e efeitos sonoros |
 | `makefile` | Compila o jogo no Windows, no Linux e no macOS |
 
@@ -93,6 +105,7 @@ Módulos principais em `src/`:
 | `barra_itens.c` | Barra de itens e desenho dos itens |
 | `lanterna.c` | Carga e raio da lanterna |
 | `ranking.c` | Ranking em arquivo |
+| `esconderijo.c` | Texturas, desenho e proximidade dos guarda-roupas e caixas |
 | `ordem_desenho.c` | Ordem em que os elementos do chão são desenhados |
 | `menu.c` | Tela inicial e telas de pausa, fim e vitória |
 | `som.c` | Músicas e efeitos |

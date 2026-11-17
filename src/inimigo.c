@@ -14,6 +14,7 @@
 #define TEMPO_PROCURANDO 3.0f
 #define DISTANCIA_MINIMA_NASCIMENTO 250.0f
 #define DISTANCIA_MINIMA_PATRULHA 80.0f
+#define DISTANCIA_AFASTAMENTO_ESCONDERIJO 120.0f
 #define INTERVALO_ANIMACAO_INIMIGO 0.18f
 #define ALTURA_SPRITE_INIMIGO 20.0f
 #define QUANTIDADE_SPRITES_INIMIGO 4
@@ -60,6 +61,19 @@ static void EscolherAlvoPatrulha(Inimigo *inimigo){
     if (EncontrarPosicaoAcessivelAleatoria(inimigo->posicao, DISTANCIA_MINIMA_PATRULHA,
                                            NULL, 0, 0.0f, &alvo)) {
         AtualizarMapaDistancias(alvo);
+    }
+}
+
+static void AfastarDoEsconderijo(Inimigo *inimigo, Vector2 esconderijo){
+    Vector2 alvo;
+
+    inimigo->estado = INIMIGO_PATRULHANDO;
+    inimigo->tempoProcurando = 0.0f;
+    if (EncontrarPosicaoAcessivelAleatoria(esconderijo, DISTANCIA_AFASTAMENTO_ESCONDERIJO,
+                                           NULL, 0, 0.0f, &alvo)) {
+        AtualizarMapaDistancias(alvo);
+    } else {
+        EscolherAlvoPatrulha(inimigo);
     }
 }
 
@@ -117,13 +131,20 @@ bool PosicionarInimigo(Inimigo *inimigo, Vector2 posicaoJogador){
     return true;
 }
 
-void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa, float deltaTempo){
+void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa,
+                      bool jogadorEscondido, float deltaTempo){
     const float alcance = lanternaAcesa ? ALCANCE_VISAO_LANTERNA_ACESA : ALCANCE_VISAO_ESCURO;
-    const bool vendoJogador =
+    const bool vendoJogador = !jogadorEscondido &&
         Vector2DistanceSqr(inimigo->posicao, posicaoJogador) <= alcance * alcance &&
         LinhaLivre(inimigo->posicao, posicaoJogador);
 
-    if (vendoJogador) {
+    if (jogadorEscondido) {
+        /* Perdeu o jogador de vista: nunca vai "procurar" no ultimo ponto visto (o esconderijo)
+           e sempre escolhe patrulhas longe dele, para nao ficar acampado na porta. */
+        if (inimigo->estado != INIMIGO_PATRULHANDO || ChegouAoAlvoDoMapa(inimigo->posicao)) {
+            AfastarDoEsconderijo(inimigo, posicaoJogador);
+        }
+    } else if (vendoJogador) {
         inimigo->tempoRecalculo -= deltaTempo;
         if (inimigo->estado != INIMIGO_PERSEGUINDO || inimigo->tempoRecalculo <= 0.0f) {
             AtualizarMapaDistancias(posicaoJogador);

@@ -14,6 +14,11 @@ bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
                                         int quantidadePosicoesOcupadas,
                                         float distanciaMinimaEntrePosicoes,
                                         Vector2 *posicao);
+bool EncontrarPosicaoProximaParede(Vector2 origem, float distanciaMinima,
+                                   const Vector2 *posicoesOcupadas,
+                                   int quantidadePosicoesOcupadas,
+                                   float distanciaMinimaEntrePosicoes,
+                                   Vector2 *posicao);
 Vector2 MoverComColisao(Vector2 posicaoJogador, Vector2 deslocamentoJogador);
 bool AtualizarMapaDistancias(Vector2 alvo);
 Vector2 ProximoPontoNoCaminho(Vector2 posicao);

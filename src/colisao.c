@@ -174,11 +174,11 @@ bool PodeOcupar(Vector2 posicaoJogador){
     return true;
 }
 
-bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
-                                        const Vector2 *posicoesOcupadas,
-                                        int quantidadePosicoesOcupadas,
-                                        float distanciaMinimaEntrePosicoes,
-                                        Vector2 *posicao){
+static bool EncontrarPosicaoAcessivel(Vector2 origem, float distanciaMinima,
+                                      const Vector2 *posicoesOcupadas,
+                                      int quantidadePosicoesOcupadas,
+                                      float distanciaMinimaEntrePosicoes,
+                                      Vector2 *posicao, bool proximaParede){
     if (pixelsMascaraParedes == NULL || posicao == NULL || distanciaMinima < 0.0f ||
         distanciaMinimaEntrePosicoes < 0.0f || quantidadePosicoesOcupadas < 0 ||
         (quantidadePosicoesOcupadas > 0 && posicoesOcupadas == NULL)) {
@@ -250,6 +250,26 @@ bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
             candidata.y < 8.0f || candidata.y > MAPA_ALTURA - 8.0f ||
             Vector2DistanceSqr(origem, candidata) < distanciaMinimaSqr) continue;
 
+        if (proximaParede) {
+            const Vector2 deslocamentos[] = {
+                {10.0f, 0.0f}, {-10.0f, 0.0f},
+                {0.0f, 10.0f}, {0.0f, -10.0f}
+            };
+            bool encontrouParedeProxima = false;
+
+            for (int d = 0; d < 4; d++) {
+                const Vector2 pontoVizinho = {
+                    candidata.x + deslocamentos[d].x,
+                    candidata.y + deslocamentos[d].y
+                };
+                if (!PodeOcupar(pontoVizinho)) {
+                    encontrouParedeProxima = true;
+                    break;
+                }
+            }
+            if (!encontrouParedeProxima) continue;
+        }
+
         bool muitoProxima = false;
         for (int j = 0; j < quantidadePosicoesOcupadas; j++) {
             if (Vector2DistanceSqr(posicoesOcupadas[j], candidata) <
@@ -274,6 +294,26 @@ bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
         TraceLog(LOG_ERROR, "Nao ha posicoes acessiveis para o item no mapa.");
     }
     return encontrouPosicao;
+}
+
+bool EncontrarPosicaoAcessivelAleatoria(Vector2 origem, float distanciaMinima,
+                                        const Vector2 *posicoesOcupadas,
+                                        int quantidadePosicoesOcupadas,
+                                        float distanciaMinimaEntrePosicoes,
+                                        Vector2 *posicao){
+    return EncontrarPosicaoAcessivel(origem, distanciaMinima, posicoesOcupadas,
+                                     quantidadePosicoesOcupadas,
+                                     distanciaMinimaEntrePosicoes, posicao, false);
+}
+
+bool EncontrarPosicaoProximaParede(Vector2 origem, float distanciaMinima,
+                                   const Vector2 *posicoesOcupadas,
+                                   int quantidadePosicoesOcupadas,
+                                   float distanciaMinimaEntrePosicoes,
+                                   Vector2 *posicao){
+    return EncontrarPosicaoAcessivel(origem, distanciaMinima, posicoesOcupadas,
+                                     quantidadePosicoesOcupadas,
+                                     distanciaMinimaEntrePosicoes, posicao, true);
 }
 
 Vector2 MoverComColisao(Vector2 posicaoJogador, Vector2 deslocamentoJogador){

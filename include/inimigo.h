@@ -25,7 +25,8 @@ bool CarregarSpritesInimigo(void);
 void LiberarSpritesInimigo(void);
 void DesenharInimigo(const Inimigo *inimigo);
 bool PosicionarInimigo(Inimigo *inimigo, Vector2 posicaoJogador);
-void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa, float deltaTempo);
+void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAcesa,
+                      bool jogadorEscondido, float deltaTempo);
 bool InimigoPegouJogador(const Inimigo *inimigo, Vector2 posicaoJogador);
 
 #endif

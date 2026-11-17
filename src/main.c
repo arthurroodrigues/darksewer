@@ -8,6 +8,7 @@
 #include "inimigo.h"
 #include "ranking.h"
 #include "ordem_desenho.h"
+#include "esconderijo.h"
 #include "raymath.h"
 #include <math.h>
 #include <stdio.h>
@@ -16,10 +17,13 @@
 #define MAPA_ARQUIVO "assets/mapa.png"
 #define TELA_INICIAL_ARQUIVO "assets/tela_de_inicio.png"
 #define BATERIA_ARQUIVO "assets/bateria.png"
+#define IMAGEM_ESCAPE_ARQUIVO "assets/imagem_escapou.png"
 #define JUMPSCARE_ANIMACAO_ARQUIVO "assets/jumpscare.gif"
 #define JUMPSCARE_AUDIO_ARQUIVO "assets/jumpscare.wav"
 #define JUMPSCARE_FPS 15.0f
 #define DURACAO_APAGAO 1.5f
+#define DURACAO_FADE_ESCAPE 1.5f
+#define DURACAO_EXIBICAO_ESCAPE 4.0f
 #define INTERVALO_PISCADA_LANTERNA 0.3f
 #define DURACAO_INTRODUCAO 1.8f
 #define INTERVALO_LETRA_FALA 0.035f
@@ -36,6 +40,11 @@
 #define RAIO_PORTA 16.0f
 #define RAIO_BUEIRO 10.0f
 #define VELOCIDADE_JOGADOR 90.0f
+#define DURACAO_MAXIMA_ESCONDIDO 5.0f
+#define RECARGA_ESCONDERIJO 8.0f
+#define PROTECAO_SAIDA_ESCONDERIJO 1.5f
+#define DISTANCIA_ESCONDERIJO_JOGADOR 30.0f
+#define DISTANCIA_ENTRE_ESCONDERIJOS 45.0f
 #define JOGADOR_INICIAL_X 100.0f
 #define JOGADOR_INICIAL_Y 590.0f
 #define ARQUIVO_SPRITE_PARADO "assets/jogador_parado.png"
@@ -99,6 +108,7 @@ typedef enum {
     ESTADO_PAUSADO,
     ESTADO_APAGAO,
     ESTADO_JUMPSCARE,
+    ESTADO_TELA_ESCAPE,
     ESTADO_FIM,
     ESTADO_VITORIA,
     ESTADO_RANKING
@@ -119,6 +129,13 @@ typedef struct {
     bool olhandoParaFrente;
     bool olhandoVertical;
     bool quadroAnimacaoAndando;
+    Esconderijo esconderijos[QUANTIDADE_ESCONDERIJOS];
+    bool escondido;
+    int indiceEscondido;
+    Vector2 posicaoAntesDeEsconder;
+    float tempoEscondido;
+    float recargaEsconderijo;
+    float protecaoSaida;
 } Partida;
 
 static Vector2 AlvoDaBussola(const Partida *partida){
@@ -158,7 +175,45 @@ static bool IniciarPartida(Partida *partida, loot *primeiroSlot){
             total++;
         }
     }
+
+    Vector2 posicoesEsconderijos[QUANTIDADE_ITENS_MAPA + QUANTIDADE_ESCONDERIJOS];
+    for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) posicoesEsconderijos[i] = partida->itens[i].posicao;
+    int totalOcupadas = QUANTIDADE_ITENS_MAPA;
+
+    for (int i = 0; i < QUANTIDADE_ESCONDERIJOS; i++) {
+        Vector2 posicao = {0};
+        bool valida = false;
+        for (int tentativa = 0; tentativa < 30 && !valida; tentativa++) {
+            if (!EncontrarPosicaoProximaParede(
+                    partida->jogador, DISTANCIA_ESCONDERIJO_JOGADOR, posicoesEsconderijos, totalOcupadas,
+                    DISTANCIA_ENTRE_ESCONDERIJOS, &posicao)) return false;
+            valida = PodeOcupar(posicao) &&
+                     Vector2DistanceSqr(posicao, kBueiro) > 30.0f * 30.0f &&
+                     Vector2DistanceSqr(posicao, kCentroPorta) > 35.0f * 35.0f;
+        }
+        if (!valida) return false;
+        posicoesEsconderijos[totalOcupadas++] = posicao;
+        partida->esconderijos[i] = (Esconderijo){
+            posicao, i < QUANTIDADE_ARMARIOS ? ESCONDERIJO_ARMARIO : ESCONDERIJO_CAIXA
+        };
+    }
+
     return PosicionarInimigo(&partida->inimigo, partida->jogador);
+}
+
+static void EntrarNoEsconderijo(Partida *partida, int indice){
+    partida->escondido = true;
+    partida->indiceEscondido = indice;
+    partida->tempoEscondido = 0.0f;
+    partida->posicaoAntesDeEsconder = partida->jogador;
+    partida->jogador = partida->esconderijos[indice].posicao;
+}
+
+static void SairDoEsconderijo(Partida *partida){
+    partida->escondido = false;
+    partida->jogador = partida->posicaoAntesDeEsconder;
+    partida->recargaEsconderijo = RECARGA_ESCONDERIJO;
+    partida->protecaoSaida = PROTECAO_SAIDA_ESCONDERIJO;
 }
 
 static int ContarCaracteresUTF8(const char *texto){
@@ -205,6 +260,22 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     }
     AtualizarLanterna(&partida->lanterna, deltaTempo);
 
+    const bool pediuEsconderijo = IsKeyPressed(KEY_H) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT);
+    if (partida->escondido) {
+        partida->tempoEscondido += deltaTempo;
+        if (pediuEsconderijo || partida->tempoEscondido >= DURACAO_MAXIMA_ESCONDIDO) {
+            SairDoEsconderijo(partida);
+        }
+    } else {
+        partida->recargaEsconderijo = fmaxf(partida->recargaEsconderijo - deltaTempo, 0.0f);
+        partida->protecaoSaida = fmaxf(partida->protecaoSaida - deltaTempo, 0.0f);
+        if (pediuEsconderijo && partida->recargaEsconderijo <= 0.0f) {
+            const int indice = EsconderijoPertoDoJogador(partida->esconderijos,
+                                                         QUANTIDADE_ESCONDERIJOS, partida->jogador);
+            if (indice >= 0) EntrarNoEsconderijo(partida, indice);
+        }
+    }
+
     Vector2 direcaoMovimento = {0.0f, 0.0f};
 
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) direcaoMovimento.x -= 1.0f;
@@ -212,6 +283,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) direcaoMovimento.y -= 1.0f;
     if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) direcaoMovimento.y += 1.0f;
 
+    if (partida->escondido) direcaoMovimento = (Vector2){0.0f, 0.0f};
     const bool teclasMovimentoPressionadas = Vector2LengthSqr(direcaoMovimento) > 0.0f;
     const Vector2 posicaoAnteriorJogador = partida->jogador;
 
@@ -222,7 +294,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 
     const bool jogadorEstaSeMovendo = Vector2DistanceSqr(partida->jogador, posicaoAnteriorJogador) > 0.0001f;
 
-    for (int i = 0; i < QUANTIDADE_ITENS_MAPA; i++) {
+    for (int i = 0; i < QUANTIDADE_ITENS_MAPA && !partida->escondido; i++) {
         ItemNoMapa *item = &partida->itens[i];
         if (!item->coletado &&
             Vector2DistanceSqr(partida->jogador, item->posicao) <= RAIO_COLETA_ITEM * RAIO_COLETA_ITEM) {
@@ -231,7 +303,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
         }
     }
 
-    if (!partida->portaAberta &&
+    if (!partida->escondido && !partida->portaAberta &&
         CheckCollisionCircleRec(partida->jogador, RAIO_PORTA, kZonaPorta) &&
         ContarItemHotbar(primeiroSlot, ITEM_CHAVE) >= QUANTIDADE_CHAVES) {
         RemoverTodosDoItemHotbar(primeiroSlot, ITEM_CHAVE);
@@ -240,7 +312,7 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
         TocarSomColeta(sons);
     }
 
-    if (partida->portaAberta &&
+    if (!partida->escondido && partida->portaAberta &&
         Vector2DistanceSqr(partida->jogador, kBueiro) <= RAIO_BUEIRO * RAIO_BUEIRO) {
         partida->escapou = true;
     }
@@ -269,10 +341,11 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
         partida->quadroAnimacaoAndando = false;
     }
 
+    const bool jogadorInvisivel = partida->escondido || partida->protecaoSaida > 0.0f;
     AtualizarInimigo(&partida->inimigo, partida->jogador,
-                     LanternaAcesa(&partida->lanterna), deltaTempo);
+                     LanternaAcesa(&partida->lanterna), jogadorInvisivel, deltaTempo);
 
-    if (InimigoPegouJogador(&partida->inimigo, partida->jogador)) partida->pego = true;
+    if (!jogadorInvisivel && InimigoPegouJogador(&partida->inimigo, partida->jogador)) partida->pego = true;
 
     AtualizarPassos(sons, jogadorEstaSeMovendo);
 }
@@ -525,7 +598,14 @@ int main(void){
         return 1;
     }
     Partida partida = {0};
-    int codigoSaida = CarregarSpritesInimigo() ? 0 : 1;
+    Texture2D texturaEscape = LoadTexture(IMAGEM_ESCAPE_ARQUIVO);
+    if (texturaEscape.id == 0) {
+        TraceLog(LOG_WARNING, "Nao foi possivel carregar a imagem da fuga: %s", IMAGEM_ESCAPE_ARQUIVO);
+    } else {
+        SetTextureFilter(texturaEscape, TEXTURE_FILTER_BILINEAR);
+    }
+
+    int codigoSaida = (CarregarSpritesInimigo() && CarregarTexturasEsconderijo()) ? 0 : 1;
 
     char caminhoRanking[512];
     snprintf(caminhoRanking, sizeof(caminhoRanking), "%s%s", GetApplicationDirectory(), ARQUIVO_RANKING);
@@ -534,6 +614,7 @@ int main(void){
     char nomeJogador[TAMANHO_NOME_RANKING + 1] = "";
     int tamanhoNome = 0;
     bool digitacaoLiberada = false;
+    float tempoTelaEscape = 0.0f;
 
     while (codigoSaida == 0 && !WindowShouldClose()) {
         const float deltaTempo = fminf(GetFrameTime(), 0.05f);
@@ -630,10 +711,8 @@ int main(void){
                 quadroJumpscareAtual = -1;
                 if (IsSoundValid(somJumpscare)) PlaySound(somJumpscare);
             } else if (partida.escapou) {
-                estado = ESTADO_VITORIA;
-                nomeJogador[0] = '\0';
-                tamanhoNome = 0;
-                digitacaoLiberada = false;
+                estado = ESTADO_TELA_ESCAPE;
+                tempoTelaEscape = 0.0f;
             } else if (partida.lanterna.carga <= 0.0f) {
                 estado = ESTADO_APAGAO;
                 tempoApagao = 0.0f;
@@ -744,6 +823,39 @@ int main(void){
             continue;
         }
 
+        if (estado == ESTADO_TELA_ESCAPE) {
+            tempoTelaEscape += deltaTempo;
+            const float opacidade = fminf(tempoTelaEscape / DURACAO_FADE_ESCAPE, 1.0f);
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+            if (texturaEscape.id != 0) {
+                const float escala = fminf((float)larguraTela / texturaEscape.width,
+                                           (float)alturaTela / texturaEscape.height);
+                const float larguraImagem = (float)texturaEscape.width * escala;
+                const float alturaImagem = (float)texturaEscape.height * escala;
+                const Rectangle origem = {
+                    0.0f, 0.0f, (float)texturaEscape.width, (float)texturaEscape.height
+                };
+                const Rectangle destino = {
+                    (larguraTela - larguraImagem) * 0.5f,
+                    (alturaTela - alturaImagem) * 0.5f,
+                    larguraImagem, alturaImagem
+                };
+                DrawTexturePro(texturaEscape, origem, destino, (Vector2){0.0f, 0.0f}, 0.0f,
+                               (Color){255, 255, 255, (unsigned char)(255.0f * opacidade)});
+            }
+            EndDrawing();
+
+            if (tempoTelaEscape >= DURACAO_FADE_ESCAPE + DURACAO_EXIBICAO_ESCAPE) {
+                estado = ESTADO_VITORIA;
+                nomeJogador[0] = '\0';
+                tamanhoNome = 0;
+                digitacaoLiberada = false;
+            }
+            continue;
+        }
+
         camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
         camera.zoom = ZOOM_CAMERA;
         const float metadeLarguraVisivel = larguraTela / (2.0f * camera.zoom);
@@ -790,7 +902,7 @@ int main(void){
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
 
-        ElementoDesenho elementos[QUANTIDADE_ITENS_MAPA + 2];
+        ElementoDesenho elementos[QUANTIDADE_ITENS_MAPA + QUANTIDADE_ESCONDERIJOS + 2];
         int quantidadeElementos = 0;
         const float baseItem = TAMANHO_ITEM_MAPA * 0.5f;
 
@@ -799,8 +911,14 @@ int main(void){
             elementos[quantidadeElementos++] =
                 (ElementoDesenho){partida.itens[i].posicao.y + baseItem, DESENHO_ITEM, i};
         }
+        for (int i = 0; i < QUANTIDADE_ESCONDERIJOS; i++) {
+            elementos[quantidadeElementos++] =
+                (ElementoDesenho){partida.esconderijos[i].posicao.y, DESENHO_ESCONDERIJO, i};
+        }
         elementos[quantidadeElementos++] = (ElementoDesenho){partida.inimigo.posicao.y, DESENHO_INIMIGO, 0};
-        elementos[quantidadeElementos++] = (ElementoDesenho){partida.jogador.y, DESENHO_JOGADOR, 0};
+        if (!partida.escondido) {
+            elementos[quantidadeElementos++] = (ElementoDesenho){partida.jogador.y, DESENHO_JOGADOR, 0};
+        }
 
         OrdenarPorProfundidade(elementos, quantidadeElementos);
 
@@ -810,6 +928,9 @@ int main(void){
                     const ItemNoMapa *item = &partida.itens[elementos[i].indice];
                     DesenharItem(item->item, item->posicao, TAMANHO_ITEM_MAPA, bateria);
                 } break;
+                case DESENHO_ESCONDERIJO:
+                    DesenharEsconderijo(&partida.esconderijos[elementos[i].indice]);
+                    break;
                 case DESENHO_INIMIGO: DesenharInimigo(&partida.inimigo); break;
                 case DESENHO_JOGADOR: DesenharJogador(partida.jogador, spriteAtual); break;
             }
@@ -867,6 +988,29 @@ int main(void){
             DrawText(objetivo, (larguraTela - MeasureText(objetivo, 20)) / 2, alturaTela - 36, 20,
                      (Color){150, 112, 72, 255});
 
+            if (estado == ESTADO_JOGANDO && partida.escondido) {
+                const float restante = DURACAO_MAXIMA_ESCONDIDO - partida.tempoEscondido;
+                const char *aviso = TextFormat("Escondido: %.1fs  (H para sair)", fmaxf(restante, 0.0f));
+                const int larguraBarra = 240;
+                const int xBarra = (larguraTela - larguraBarra) / 2;
+                DrawText(aviso, (larguraTela - MeasureText(aviso, 22)) / 2, alturaTela - 100, 22,
+                         (Color){214, 204, 190, 255});
+                DrawRectangle(xBarra, alturaTela - 70, larguraBarra, 10, (Color){10, 16, 15, 200});
+                DrawRectangle(xBarra, alturaTela - 70,
+                              (int)((float)larguraBarra * fmaxf(restante, 0.0f) / DURACAO_MAXIMA_ESCONDIDO),
+                              10, (Color){150, 112, 72, 255});
+                DrawRectangleLinesEx((Rectangle){xBarra, alturaTela - 70, larguraBarra, 10}, 2,
+                                     (Color){74, 88, 82, 255});
+            } else if (estado == ESTADO_JOGANDO &&
+                       EsconderijoPertoDoJogador(partida.esconderijos, QUANTIDADE_ESCONDERIJOS,
+                                                 partida.jogador) >= 0) {
+                const char *aviso = partida.recargaEsconderijo > 0.0f
+                    ? TextFormat("Esconderijo disponível em %.0fs", ceilf(partida.recargaEsconderijo))
+                    : "H - Esconder-se";
+                DrawText(aviso, (larguraTela - MeasureText(aviso, 24)) / 2, alturaTela - 70, 24,
+                         (Color){214, 204, 190, 255});
+            }
+
             if (estado == ESTADO_JOGANDO && !partida.portaAberta &&
                 CheckCollisionCircleRec(partida.jogador, RAIO_PORTA, kZonaPorta)) {
                 const int faltam = QUANTIDADE_CHAVES - ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
@@ -887,7 +1031,9 @@ int main(void){
 
     LiberarRanking(ranking);
     LiberarSpritesInimigo();
+    LiberarTexturasEsconderijo();
     LiberarHotbar(primeiroSlot);
+    if (texturaEscape.id != 0) UnloadTexture(texturaEscape);
     UnloadShader(shaderLanterna);
     if (IsSoundValid(somJumpscare)) UnloadSound(somJumpscare);
     LiberarSons(&sonsJogo);
