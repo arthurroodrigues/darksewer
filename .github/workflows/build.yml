@@ -1,6 +1,5 @@
 name: build
 
-# Compila o jogo nos tres sistemas. Nao roda o jogo: ele precisa de tela.
 on:
   push:
     branches: [main]
@@ -49,7 +48,6 @@ jobs:
       - name: Instalar dependencias
         uses: msys2/setup-msys2@v2
         with:
-          # o MSYS2 so publica a raylib para o ambiente UCRT64
           msystem: UCRT64
           update: true
           install: >-

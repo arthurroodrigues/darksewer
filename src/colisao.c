@@ -5,7 +5,6 @@
 #include "raymath.h"
 
 #define PAREDES_ARQUIVO "assets/mapa_paredes.png"
-// caixa de colisao do personagem: cobre das pernas ate a cintura, para o corpo nao entrar nas paredes
 #define MEIA_LARGURA_HITBOX 3.0f
 #define ALTURA_HITBOX 8.0f
 #define DESLOCAMENTO_HITBOX_Y 2.0f
@@ -301,7 +300,6 @@ Vector2 MoverComColisao(Vector2 posicaoJogador, Vector2 deslocamentoJogador){
     return posicaoJogador;
 }
 
-// limitacao: existe um unico mapa de distancias, entao so serve a um inimigo por vez.
 bool AtualizarMapaDistancias(Vector2 alvo){
     const int origem = CelulaLivreMaisProxima(alvo);
     if (origem < 0) return false;
@@ -351,7 +349,6 @@ Vector2 ProximoPontoNoCaminho(Vector2 posicao){
             if (distanciasGrade[vizinho] < 0 ||
                 distanciasGrade[vizinho] >= distanciasGrade[melhor]) continue;
 
-            // diagonal so vale quando nao corta a quina de uma parede
             if (dx != 0 && dy != 0 &&
                 (!gradeLivre[y * colunasGrade + vizinhoX] ||
                  !gradeLivre[vizinhoY * colunasGrade + x])) continue;
@@ -380,7 +377,6 @@ bool LinhaLivre(Vector2 origem, Vector2 destino){
     return true;
 }
 
-// Fecha uma area do mapa (porta trancada). Largura zero libera de novo.
 void DefinirZonaBloqueada(Rectangle zona){
     zonaBloqueada = zona;
     if (gradeLivre != NULL) PreencherGradeCaminhada();

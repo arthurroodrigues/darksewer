@@ -140,7 +140,6 @@ void DesenharHotbar(loot *primeiro, loot *selecionado, Texture2D bateria){
     }
 }
 
-// Chave desenhada com formas: argola a esquerda, haste e dois dentes.
 static void DesenharChave(Vector2 centro, float tamanho){
     const Color cor = {212, 175, 55, 255};
     const float raio = tamanho * 0.22f;
@@ -154,7 +153,6 @@ static void DesenharChave(Vector2 centro, float tamanho){
     DrawRectangleRec((Rectangle){centro.x + tamanho * 0.38f, centro.y, espessura, tamanho * 0.16f}, cor);
 }
 
-// Bussola desenhada com formas: aro dourado e agulha de duas cores.
 static void DesenharBussola(Vector2 centro, float tamanho){
     const float raio = tamanho * 0.42f;
     const float meiaLargura = raio * 0.22f;
@@ -169,7 +167,6 @@ static void DesenharBussola(Vector2 centro, float tamanho){
                  (Vector2){centro.x - meiaLargura, centro.y}, (Color){230, 220, 200, 255});
 }
 
-// Desenha um item centrado em um ponto, cabendo em um quadrado de lado `tamanho`.
 void DesenharItem(ItemHotbar item, Vector2 centro, float tamanho, Texture2D bateria){
     if (item == ITEM_BATERIA && bateria.id != 0) {
         const int maiorLado = bateria.width > bateria.height ? bateria.width : bateria.height;

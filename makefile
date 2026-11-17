@@ -1,6 +1,5 @@
 CC = gcc
 
-# o nome do executavel e as bibliotecas do sistema mudam conforme onde se compila
 ifeq ($(OS),Windows_NT)
     TARGET = jogo.exe
     LIBS_SISTEMA = -lopengl32 -lgdi32 -lwinmm

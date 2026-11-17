@@ -5,8 +5,6 @@
 
 #define TEMPO_MAXIMO_RANKING 359999.0f
 
-// Lista encadeada ordenada pelo tempo: o novo registro entra antes do primeiro mais lento.
-// Devolve o registro criado, ou NULL se ele nao coube entre os melhores.
 RegistroRanking *InserirNoRanking(RegistroRanking **primeiro, const char *nome, float tempo){
     RegistroRanking *novo = malloc(sizeof(*novo));
     if (novo == NULL) return NULL;
@@ -29,7 +27,6 @@ RegistroRanking *InserirNoRanking(RegistroRanking **primeiro, const char *nome, 
     novo->proximo = *elo;
     *elo = novo;
 
-    // so os melhores ficam: corta o que passar do limite
     RegistroRanking *ultimo = *primeiro;
     for (int i = 1; i < QUANTIDADE_MAXIMA_RANKING && ultimo != NULL; i++) ultimo = ultimo->proximo;
     if (ultimo != NULL) {
@@ -49,7 +46,6 @@ RegistroRanking *CarregarRanking(const char *caminho){
         char nome[TAMANHO_NOME_RANKING + 1];
         float tempo;
 
-        // linha valida: nome de ate 10 caracteres, ponto e virgula e um tempo positivo
         if (sscanf(linha, "%10[^;\n];%f", nome, &tempo) != 2) continue;
         if (!isfinite(tempo) || tempo <= 0.0f || tempo > TEMPO_MAXIMO_RANKING) continue;
         InserirNoRanking(&primeiro, nome, tempo);

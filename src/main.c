@@ -17,7 +17,7 @@
 #define TELA_INICIAL_ARQUIVO "assets/tela_de_inicio.png"
 #define BATERIA_ARQUIVO "assets/bateria.png"
 #define INTERVALO_ANIMACAO 0.18f
-#define ZOOM_CAMERA 10.0f
+#define ZOOM_CAMERA 12.0f
 #define INTENSIDADE_ESCURO 0.99f
 #define TAMANHO_ITEM_MAPA 9.0f
 #define RAIO_COLETA_ITEM 10.0f
@@ -43,7 +43,6 @@
 #define ALTURA_JANELA 720
 #define ARQUIVO_RANKING "ranking.txt"
 
-// grade que fecha o recuo do poco, na sala central; o jogador escapa pelo poco
 static const Rectangle kZonaPorta = {250.0f, 242.0f, 70.0f, 8.0f};
 static const Vector2 kCentroPorta = {285.0f, 246.0f};
 static const Vector2 kBueiro = {287.0f, 310.0f};
@@ -54,7 +53,6 @@ typedef struct {
     bool coletado;
 } ItemNoMapa;
 
-// o que nasce no mapa a cada partida: quantos, a que distancia do jogador e entre si
 static const struct {
     ItemHotbar item;
     int quantidade;
@@ -107,8 +105,6 @@ typedef struct {
     bool quadroAnimacaoAndando;
 } Partida;
 
-// Para onde a bussola aponta: a chave mais proxima ainda no mapa;
-// sem chaves para pegar, a porta; com a porta aberta, o bueiro.
 static Vector2 AlvoDaBussola(const Partida *partida){
     Vector2 alvo = partida->portaAberta ? kBueiro : kCentroPorta;
     float menorDistancia = -1.0f;
@@ -235,7 +231,6 @@ static void AtualizarPartida(Partida *partida, loot *primeiroSlot, Sons *sons, f
 }
 
 int main(void){
-    // os arquivos do jogo ficam ao lado do executavel, nao importa de onde ele foi aberto
     ChangeDirectory(GetApplicationDirectory());
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
@@ -503,7 +498,6 @@ int main(void){
             AtualizarPassos(&sonsJogo, false);
             if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
             if (estado == ESTADO_VITORIA) {
-                // so comeca a digitar depois de soltar as teclas de andar, para elas nao entrarem no nome
                 if (!digitacaoLiberada) {
                     digitacaoLiberada = !IsKeyDown(KEY_W) && !IsKeyDown(KEY_A) &&
                                         !IsKeyDown(KEY_S) && !IsKeyDown(KEY_D);
@@ -578,7 +572,6 @@ int main(void){
         const Rectangle destinoMapa = {0.0f, 0.0f, (float)MAPA_LARGURA, (float)MAPA_ALTURA};
         DrawTexturePro(mapa, origemMapa, destinoMapa, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         if (!partida.portaAberta) {
-            // grade de ferro fechando a passagem
             DrawRectangleRec((Rectangle){kZonaPorta.x, kZonaPorta.y + 2.0f,
                                          kZonaPorta.width, kZonaPorta.height - 4.0f}, (Color){28, 30, 32, 235});
             for (float x = kZonaPorta.x + 1.0f; x < kZonaPorta.x + kZonaPorta.width; x += 4.0f) {
@@ -594,8 +587,6 @@ int main(void){
                 ? (partida.quadroAnimacaoAndando ? spriteAndandoEsquerda : spriteParadoEsquerda)
                 : (partida.quadroAnimacaoAndando ? spriteAndando : spriteParado));
 
-        // Tudo que fica no chao entra numa lista ordenada pela base:
-        // quem esta mais abaixo na tela e desenhado por ultimo e fica na frente.
         ElementoDesenho elementos[QUANTIDADE_ITENS_MAPA + 2];
         int quantidadeElementos = 0;
         const float baseItem = TAMANHO_ITEM_MAPA * 0.5f;
@@ -628,7 +619,6 @@ int main(void){
         EndShaderMode();
 
         if (estado == ESTADO_JOGANDO && partida.slotSelecionado->item == ITEM_BUSSOLA) {
-            // seta em volta do jogador, apontando para o alvo da bussola
             const Vector2 centro = GetWorldToScreen2D(
                 (Vector2){partida.jogador.x, partida.jogador.y - 9.0f}, camera);
             const Vector2 alvo = GetWorldToScreen2D(AlvoDaBussola(&partida), camera);
@@ -646,7 +636,6 @@ int main(void){
         const char *relogio = FormatarTempo(partida.tempoPartida);
         DrawText(relogio, (larguraTela - MeasureText(relogio, 24)) / 2, 20, 24, (Color){214, 204, 190, 255});
 
-        // objetivo do momento, no rodape da tela
         const int chavesNaMao = ContarItemHotbar(primeiroSlot, ITEM_CHAVE);
         const char *objetivo = partida.portaAberta
             ? "Escape pelo poço"

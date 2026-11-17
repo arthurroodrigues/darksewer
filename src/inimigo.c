@@ -18,7 +18,6 @@
 #define ALTURA_SPRITE_INIMIGO 20.0f
 #define QUANTIDADE_SPRITES_INIMIGO 4
 
-// As imagens novas têm uma pose por direção. A mesma pose é usada parado e andando.
 static const char *const kArquivosSprites[QUANTIDADE_SPRITES_INIMIGO] = {
     "assets/inimigo_sprite_direita.png",
     "assets/inimigo_sprite_esquerda.png",
@@ -132,7 +131,6 @@ void AtualizarInimigo(Inimigo *inimigo, Vector2 posicaoJogador, bool lanternaAce
         }
         inimigo->estado = INIMIGO_PERSEGUINDO;
     } else if (inimigo->estado == INIMIGO_PERSEGUINDO) {
-        // o mapa ainda aponta para o ultimo lugar em que o jogador foi visto
         inimigo->estado = INIMIGO_PROCURANDO;
         inimigo->tempoProcurando = 0.0f;
     } else if (ChegouAoAlvoDoMapa(inimigo->posicao)) {

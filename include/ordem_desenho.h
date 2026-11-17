@@ -7,8 +7,6 @@ typedef enum {
     DESENHO_JOGADOR
 } TipoDesenho;
 
-// Um elemento do chao a desenhar. A base e a posicao vertical dos pes do
-// personagem ou da borda de baixo do item; o indice diz qual item do mapa.
 typedef struct {
     float base;
     TipoDesenho tipo;
