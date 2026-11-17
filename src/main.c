@@ -16,6 +16,9 @@
 #define MAPA_ARQUIVO "assets/mapa.png"
 #define TELA_INICIAL_ARQUIVO "assets/tela_de_inicio.png"
 #define BATERIA_ARQUIVO "assets/bateria.png"
+#define JUMPSCARE_ANIMACAO_ARQUIVO "assets/jumpscare.gif"
+#define JUMPSCARE_AUDIO_ARQUIVO "assets/jumpscare.wav"
+#define JUMPSCARE_FPS 15.0f
 #define INTERVALO_ANIMACAO 0.18f
 #define ZOOM_CAMERA 12.0f
 #define INTENSIDADE_ESCURO 0.99f
@@ -83,6 +86,7 @@ typedef enum {
     ESTADO_MENU,
     ESTADO_JOGANDO,
     ESTADO_PAUSADO,
+    ESTADO_JUMPSCARE,
     ESTADO_FIM,
     ESTADO_VITORIA,
     ESTADO_RANKING
@@ -301,8 +305,9 @@ int main(void){
         !FileExists(ARQUIVO_SPRITE_ANDANDO_ESQUERDA) ||
         !FileExists(ARQUIVO_SPRITE_FRENTE) || !FileExists(ARQUIVO_SPRITE_PARADO_FRENTE) ||
         !FileExists(ARQUIVO_SPRITE_TRAS) || !FileExists(ARQUIVO_SPRITE_PARADO_TRAS) ||
-        !FileExists(BATERIA_ARQUIVO)) {
-        TraceLog(LOG_ERROR, "Sprites ou bateria ausentes. Verifique os arquivos dentro da pasta assets.");
+        !FileExists(BATERIA_ARQUIVO) || !FileExists(JUMPSCARE_ANIMACAO_ARQUIVO) ||
+        !FileExists(JUMPSCARE_AUDIO_ARQUIVO)) {
+        TraceLog(LOG_ERROR, "Sprites, bateria ou arquivos do jumpscare ausentes.");
         LiberarMascaraParedes();
         UnloadTexture(telaInicial);
         UnloadTexture(mapa);
@@ -351,6 +356,51 @@ int main(void){
     SetTextureFilter(spriteParadoTras, TEXTURE_FILTER_POINT);
     SetTextureFilter(bateria, TEXTURE_FILTER_BILINEAR);
 
+    int quantidadeQuadrosJumpscare = 0;
+    Image imagemJumpscare = LoadImageAnim(JUMPSCARE_ANIMACAO_ARQUIVO, &quantidadeQuadrosJumpscare);
+    if (imagemJumpscare.data == NULL || imagemJumpscare.width <= 0 ||
+        imagemJumpscare.height <= 0 || quantidadeQuadrosJumpscare <= 0) {
+        TraceLog(LOG_ERROR, "Falha ao carregar a animação do jumpscare.");
+        if (imagemJumpscare.data != NULL) UnloadImage(imagemJumpscare);
+        UnloadTexture(spriteParado);
+        UnloadTexture(spriteAndando);
+        UnloadTexture(spriteParadoEsquerda);
+        UnloadTexture(spriteAndandoEsquerda);
+        UnloadTexture(spriteFrente);
+        UnloadTexture(spriteParadoFrente);
+        UnloadTexture(spriteTras);
+        UnloadTexture(spriteParadoTras);
+        UnloadTexture(bateria);
+        LiberarMascaraParedes();
+        UnloadTexture(telaInicial);
+        UnloadTexture(mapa);
+        CloseWindow();
+        return 1;
+    }
+
+    Texture2D texturaJumpscare = LoadTextureFromImage(imagemJumpscare);
+    if (texturaJumpscare.id == 0) {
+        TraceLog(LOG_ERROR, "Falha ao criar a textura do jumpscare.");
+        UnloadImage(imagemJumpscare);
+        UnloadTexture(spriteParado);
+        UnloadTexture(spriteAndando);
+        UnloadTexture(spriteParadoEsquerda);
+        UnloadTexture(spriteAndandoEsquerda);
+        UnloadTexture(spriteFrente);
+        UnloadTexture(spriteParadoFrente);
+        UnloadTexture(spriteTras);
+        UnloadTexture(spriteParadoTras);
+        UnloadTexture(bateria);
+        LiberarMascaraParedes();
+        UnloadTexture(telaInicial);
+        UnloadTexture(mapa);
+        CloseWindow();
+        return 1;
+    }
+    SetTextureFilter(texturaJumpscare, TEXTURE_FILTER_BILINEAR);
+    const int bytesPorQuadroJumpscare = GetPixelDataSize(
+        imagemJumpscare.width, imagemJumpscare.height, imagemJumpscare.format);
+
     Sons sonsJogo = {0};
     
     const bool audioDisponivel = InicializarSons(&sonsJogo);
@@ -360,10 +410,21 @@ int main(void){
         PlayMusicStream(sonsJogo.musicaFundo);
     }
 
+    Sound somJumpscare = {0};
+    if (audioDisponivel) {
+        somJumpscare = LoadSound(JUMPSCARE_AUDIO_ARQUIVO);
+        if (!IsSoundValid(somJumpscare)) {
+            TraceLog(LOG_WARNING, "Nao foi possivel carregar o audio do jumpscare.");
+        }
+    }
+
     Shader shaderLanterna = LoadShaderFromMemory(NULL, kShaderLanterna);
     if (!IsShaderValid(shaderLanterna)) {
         TraceLog(LOG_ERROR, "Nao foi possivel criar o shader da lanterna.");
+        if (IsSoundValid(somJumpscare)) UnloadSound(somJumpscare);
         LiberarSons(&sonsJogo);
+        UnloadTexture(texturaJumpscare);
+        UnloadImage(imagemJumpscare);
         UnloadTexture(spriteParado);
         UnloadTexture(spriteAndando);
         UnloadTexture(spriteParadoEsquerda);
@@ -390,12 +451,17 @@ int main(void){
 
     EstadoJogo estado = ESTADO_MENU;
     float opacidadeTelaInicial = 0.0f;
+    float tempoJumpscare = 0.0f;
+    int quadroJumpscareAtual = -1;
 
     loot *primeiroSlot = CriarHotbar();
     if (primeiroSlot == NULL) {
         TraceLog(LOG_ERROR, "Falha ao criar a barra de itens.");
         UnloadShader(shaderLanterna);
+        if (IsSoundValid(somJumpscare)) UnloadSound(somJumpscare);
         LiberarSons(&sonsJogo);
+        UnloadTexture(texturaJumpscare);
+        UnloadImage(imagemJumpscare);
         UnloadTexture(spriteParado);
         UnloadTexture(spriteAndando);
         UnloadTexture(spriteParadoEsquerda);
@@ -487,8 +553,12 @@ int main(void){
 
         if (estado == ESTADO_JOGANDO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
-            if (partida.pego) estado = ESTADO_FIM;
-            else if (partida.escapou) {
+            if (partida.pego) {
+                estado = ESTADO_JUMPSCARE;
+                tempoJumpscare = 0.0f;
+                quadroJumpscareAtual = -1;
+                if (IsSoundValid(somJumpscare)) PlaySound(somJumpscare);
+            } else if (partida.escapou) {
                 estado = ESTADO_VITORIA;
                 nomeJogador[0] = '\0';
                 tamanhoNome = 0;
@@ -536,7 +606,7 @@ int main(void){
                 }
                 estado = ESTADO_JOGANDO;
             }
-            if (estado != ESTADO_VITORIA && IsKeyPressed(KEY_M)) {
+            if (estado != ESTADO_VITORIA && estado != ESTADO_JUMPSCARE && IsKeyPressed(KEY_M)) {
                 estado = ESTADO_MENU;
                 if (audioDisponivel) PlayMusicStream(sonsJogo.musicaFundo);
                 BeginDrawing();
@@ -544,6 +614,46 @@ int main(void){
                 EndDrawing();
                 continue;
             }
+        }
+
+        if (estado == ESTADO_JUMPSCARE) {
+            tempoJumpscare += GetFrameTime();
+            int quadro = (int)(tempoJumpscare * JUMPSCARE_FPS);
+            if (quadro >= quantidadeQuadrosJumpscare) quadro = quantidadeQuadrosJumpscare - 1;
+            if (quadro != quadroJumpscareAtual) {
+                const unsigned char *dadosQuadro =
+                    (const unsigned char *)imagemJumpscare.data +
+                    (size_t)quadro * (size_t)bytesPorQuadroJumpscare;
+                UpdateTexture(texturaJumpscare, dadosQuadro);
+                quadroJumpscareAtual = quadro;
+            }
+
+            const float escala = fminf((float)larguraTela / texturaJumpscare.width,
+                                       (float)alturaTela / texturaJumpscare.height);
+            const float larguraVideo = (float)texturaJumpscare.width * escala;
+            const float alturaVideo = (float)texturaJumpscare.height * escala;
+            const Rectangle origemVideo = {
+                0.0f, 0.0f, (float)texturaJumpscare.width, (float)texturaJumpscare.height
+            };
+            const Rectangle destinoVideo = {
+                (larguraTela - larguraVideo) * 0.5f,
+                (alturaTela - alturaVideo) * 0.5f,
+                larguraVideo, alturaVideo
+            };
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+            DrawTexturePro(texturaJumpscare, origemVideo, destinoVideo,
+                           (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+            EndDrawing();
+
+            if (tempoJumpscare >= (float)quantidadeQuadrosJumpscare / JUMPSCARE_FPS) {
+                estado = ESTADO_FIM;
+                if (IsSoundValid(somJumpscare) && IsSoundPlaying(somJumpscare)) {
+                    StopSound(somJumpscare);
+                }
+            }
+            continue;
         }
 
         camera.offset = (Vector2){larguraTela * 0.5f, alturaTela * 0.5f};
@@ -666,7 +776,10 @@ int main(void){
     LiberarSpritesInimigo();
     LiberarHotbar(primeiroSlot);
     UnloadShader(shaderLanterna);
+    if (IsSoundValid(somJumpscare)) UnloadSound(somJumpscare);
     LiberarSons(&sonsJogo);
+    UnloadTexture(texturaJumpscare);
+    UnloadImage(imagemJumpscare);
     UnloadTexture(spriteParado);
     UnloadTexture(spriteAndando);
     UnloadTexture(spriteParadoEsquerda);

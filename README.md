@@ -79,7 +79,7 @@ make
 |------------------|----------|
 | `src/` | Código-fonte |
 | `include/` | Cabeçalhos |
-| `assets/` | Imagens: mapa, máscara de paredes, personagens e itens |
+| `assets/` | Imagens do jogo, GIF e áudio do jumpscare |
 | `sons/` | Músicas e efeitos sonoros |
 | `makefile` | Compila o jogo no Windows, no Linux e no macOS |
 
