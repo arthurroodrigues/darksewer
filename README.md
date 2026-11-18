@@ -49,6 +49,7 @@ Os valores ficam no topo de `src/main.c` (`DURACAO_MAXIMA_ESCONDIDO`, `RECARGA_E
 ## Ranking
 
 Quem escapa digita um nome e entra no ranking dos 10 melhores tempos. O ranking fica salvo no arquivo `ranking.txt`, ao lado do executável.
+O comando `make clean` remove o executável e esse arquivo, reiniciando o ranking para a próxima execução.
 
 ## Como compilar
 

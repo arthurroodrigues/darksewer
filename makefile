@@ -25,4 +25,4 @@ $(TARGET): $(SOURCES) $(HEADERS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(RAYLIB) $(LIBS_SISTEMA) -lm
 
 clean:
-	$(RM) $(TARGET)
+	$(RM) $(TARGET) ranking.txt
