@@ -8,6 +8,7 @@ bool ResolverArquivoAudio(const char *caminhoRelativo, char *bufferCaminho, size
 bool InicializarSons(Sons *estadoSons);
 void LiberarSons(Sons *estadoSons);
 void AtualizarPassos(Sons *estadoSons, bool teclasMovimentoPressionadas);
+void AtualizarMusicaGameplay(Sons *estadoSons, bool deveTocar);
 void TocarSomColeta(Sons *estadoSons);
 
 #endif

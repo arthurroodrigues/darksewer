@@ -721,6 +721,15 @@ int main(void){
             }
         } else if (estado == ESTADO_APAGAO) {
             AtualizarPartida(&partida, primeiroSlot, &sonsJogo, deltaTempo);
+            if (partida.pego) {
+                estado = ESTADO_JUMPSCARE;
+                tempoJumpscare = 0.0f;
+                quadroJumpscareAtual = -1;
+                if (IsSoundValid(somJumpscare)) PlaySound(somJumpscare);
+            } else if (partida.escapou) {
+                estado = ESTADO_TELA_ESCAPE;
+                tempoTelaEscape = 0.0f;
+            }
         } else {
             AtualizarPassos(&sonsJogo, false);
             if (estado == ESTADO_PAUSADO && IsKeyPressed(KEY_Q)) break;
@@ -784,6 +793,9 @@ int main(void){
                 if (IsSoundValid(somJumpscare)) PlaySound(somJumpscare);
             }
         }
+
+        AtualizarMusicaGameplay(&sonsJogo,
+                                estado == ESTADO_JOGANDO || estado == ESTADO_APAGAO);
 
         if (estado == ESTADO_JUMPSCARE) {
             tempoJumpscare += GetFrameTime();

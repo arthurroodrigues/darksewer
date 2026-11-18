@@ -26,6 +26,7 @@ bool InicializarSons(Sons *estadoSons){
     char caminhoMusica[512];
     char caminhoPassos[512];
     char caminhoColeta[512];
+    char caminhoGameplay[512];
 
     if (!ResolverArquivoAudio("sons/musica_fundo.mp3", caminhoMusica,sizeof(caminhoMusica)) ||
         !ResolverArquivoAudio("sons/passos.mp3", caminhoPassos, sizeof(caminhoPassos))) {
@@ -48,6 +49,17 @@ bool InicializarSons(Sons *estadoSons){
         !IsMusicValid(estadoSons->musicaPassos)) {
         TraceLog(LOG_WARNING, "Falha ao carregar um ou mais audios; audio desativado.");
         return false;
+    }
+
+    if (ResolverArquivoAudio("sons/som_de_fundo.mp3", caminhoGameplay, sizeof(caminhoGameplay))) {
+        estadoSons->musicaGameplay = LoadMusicStream(caminhoGameplay);
+        if (!IsMusicValid(estadoSons->musicaGameplay)) {
+            TraceLog(LOG_WARNING, "Falha ao carregar a musica de gameplay; o jogo continuara sem ela.");
+        } else {
+            estadoSons->musicaGameplay.looping = true;
+        }
+    } else {
+        TraceLog(LOG_WARNING, "Musica de gameplay indisponivel; o jogo continuara sem ela.");
     }
 
     if (ResolverArquivoAudio("sons/coleta.wav", caminhoColeta,
@@ -78,6 +90,11 @@ void LiberarSons(Sons *estadoSons){
         UnloadMusicStream(estadoSons->musicaPassos);
     }
 
+    if (IsMusicValid(estadoSons->musicaGameplay)) {
+        StopMusicStream(estadoSons->musicaGameplay);
+        UnloadMusicStream(estadoSons->musicaGameplay);
+    }
+
     if (IsSoundValid(estadoSons->somColeta)) {
         UnloadSound(estadoSons->somColeta);
     }
@@ -100,6 +117,21 @@ void AtualizarPassos(Sons *estadoSons, bool teclasMovimentoPressionadas){
     } else if (estadoSons->somPassosTocando) {
         StopMusicStream(estadoSons->musicaPassos);
         estadoSons->somPassosTocando = false;
+    }
+}
+
+void AtualizarMusicaGameplay(Sons *estadoSons, bool deveTocar){
+    if (!estadoSons->dispositivoAudioAtivo || !IsMusicValid(estadoSons->musicaGameplay)) return;
+
+    if (deveTocar) {
+        if (!estadoSons->musicaGameplayTocando) {
+            PlayMusicStream(estadoSons->musicaGameplay);
+            estadoSons->musicaGameplayTocando = true;
+        }
+        UpdateMusicStream(estadoSons->musicaGameplay);
+    } else if (estadoSons->musicaGameplayTocando) {
+        StopMusicStream(estadoSons->musicaGameplay);
+        estadoSons->musicaGameplayTocando = false;
     }
 }
 
