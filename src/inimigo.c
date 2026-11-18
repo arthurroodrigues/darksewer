@@ -17,13 +17,17 @@
 #define DISTANCIA_AFASTAMENTO_ESCONDERIJO 120.0f
 #define INTERVALO_ANIMACAO_INIMIGO 0.18f
 #define ALTURA_SPRITE_INIMIGO 20.0f
-#define QUANTIDADE_SPRITES_INIMIGO 4
+#define QUANTIDADE_SPRITES_INIMIGO 8
 
 static const char *const kArquivosSprites[QUANTIDADE_SPRITES_INIMIGO] = {
     "assets/inimigo_sprite_direita.png",
     "assets/inimigo_sprite_esquerda.png",
     "assets/inimigo_sprite_frente.png",
-    "assets/inimigo_sprite_tras.png"
+    "assets/inimigo_sprite_tras.png",
+    "assets/inimigo_andando_direita.png",
+    "assets/inimigo_andando_esquerda.png",
+    "assets/inimigo_andando_frente.png",
+    "assets/inimigo_andando_tras.png"
 };
 static Texture2D sprites[QUANTIDADE_SPRITES_INIMIGO];
 
@@ -51,7 +55,8 @@ void DesenharInimigo(const Inimigo *inimigo){
     const int direcao = inimigo->olhandoVertical
         ? (inimigo->olhandoParaFrente ? 2 : 3)
         : (inimigo->olhandoEsquerda ? 1 : 0);
-    DesenharPersonagem(inimigo->posicao, sprites[direcao], ALTURA_SPRITE_INIMIGO, false);
+    const int quadro = direcao + (inimigo->quadroAnimacaoAndando ? 4 : 0);
+    DesenharPersonagem(inimigo->posicao, sprites[quadro], ALTURA_SPRITE_INIMIGO, false);
 }
 
 static void EscolherAlvoPatrulha(Inimigo *inimigo){
